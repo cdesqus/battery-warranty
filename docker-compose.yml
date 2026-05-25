@@ -51,7 +51,7 @@ services:
     container_name: presales-frontend-web
     restart: always
     ports:
-      - "80:80" # Maps production web port 80
+      - "8084:80" # Maps production web port 8084
     depends_on:
       - backend
 
