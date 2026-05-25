@@ -125,12 +125,12 @@ INSERT INTO units (id, serial_number, battery_model, contract_start_date, claim_
 ('NGY-26-024', 'SN-677788', 'BAT-V200 (Industrial)', '2025-08-12', 0, '2025-08-12', 150000, 0.05, NULL, NULL, 'COMP-16'),
 ('NGY-26-025', 'SN-788899', 'BAT-Z500 (Enterprise)', '2024-09-18', 0, '2024-09-18', 200000, 0.10, NULL, NULL, 'COMP-17'),
 ('NGY-26-026', 'SN-899900', 'BAT-X100 (Commercial)', '2025-02-22', 0, '2025-02-22', 100000, 0.10, NULL, NULL, 'COMP-18'),
-('NGY-26-027', 'SN-900011', 'BAT-V200 (Industrial)', '2024-12-05', 0, '2024-12-05', 150000, 0.05, NULL, NULL, 'COMP-19'),
-('NGY-26-028', 'SN-011122', 'BAT-Z500 (Enterprise)', '2025-04-18', 1, '2025-04-18', 200000, 0.10, NULL, NULL, 'COMP-20'),
-('NGY-26-029', 'SN-122233', 'BAT-X100 (Commercial)', '2024-06-10', 0, '2024-06-10', 100000, 0.10, NULL, NULL, 'COMP-21'),
-('NGY-26-030', 'SN-233344', 'BAT-V200 (Industrial)', '2025-09-01', 0, '2025-09-01', 150000, 0.10, NULL, NULL, 'COMP-22'),
-('NGY-26-031', 'SN-344455', 'BAT-Z500 (Enterprise)', '2024-11-20', 0, '2024-11-20', 200000, 0.15, NULL, NULL, 'COMP-23'),
-('NGY-26-032', 'SN-455566', 'BAT-X100 (Commercial)', '2025-03-05', 0, '2025-03-05', 100000, 0.05, NULL, NULL, 'COMP-24'),
+('NGY-26-027', 'SN-900027', 'BAT-V200 (Industrial)', '2024-12-05', 0, '2024-12-05', 150000, 0.05, NULL, NULL, 'COMP-19'),
+('NGY-26-028', 'SN-011128', 'BAT-Z500 (Enterprise)', '2025-04-18', 1, '2025-04-18', 200000, 0.10, NULL, NULL, 'COMP-20'),
+('NGY-26-029', 'SN-122239', 'BAT-X100 (Commercial)', '2024-06-10', 0, '2024-06-10', 100000, 0.10, NULL, NULL, 'COMP-21'),
+('NGY-26-030', 'SN-233349', 'BAT-V200 (Industrial)', '2025-09-01', 0, '2025-09-01', 150000, 0.10, NULL, NULL, 'COMP-22'),
+('NGY-26-031', 'SN-344459', 'BAT-Z500 (Enterprise)', '2024-11-20', 0, '2024-11-20', 200000, 0.15, NULL, NULL, 'COMP-23'),
+('NGY-26-032', 'SN-455569', 'BAT-X100 (Commercial)', '2025-03-05', 0, '2025-03-05', 100000, 0.05, NULL, NULL, 'COMP-24'),
 ('NGY-26-065', 'SN-326556', 'BAT-Z500 (Enterprise)', '2026-04-12', 0, '2026-04-12', 200000, 0.10, 'Rejected (Physical Damage)', NULL, 'COMP-25'),
 ('NGY-26-066', 'SN-437667', 'BAT-X100 (Commercial)', '2025-09-18', 1, '2025-09-18', 100000, 0.05, NULL, NULL, 'COMP-26'),
 ('NGY-26-067', 'SN-548778', 'BAT-V200 (Industrial)', '2024-01-25', 0, '2024-01-25', 150000, 0.10, NULL, NULL, 'COMP-27'),
@@ -157,7 +157,7 @@ INSERT INTO activity_logs (unit_id, serial_number, company_id, processed_by, act
 ('NGY-26-015', 'SN-700805', 'COMP-07', 'System Bot', 'Policy Check', 'Rejected (Expired)', 'Yesterday', NOW() - INTERVAL '1 day', TRUE),
 ('NGY-26-018', 'SN-011122', 'COMP-10', 'System Bot', 'Policy Check', 'Rejected (Claimed)', '2 days ago', NOW() - INTERVAL '2 days', TRUE),
 ('NGY-26-020', 'SN-233344', 'COMP-12', 'System Bot', 'Validation Check', 'Approved', '2 days ago', NOW() - INTERVAL '2 days', TRUE),
-('NGY-26-032', 'SN-455566', 'COMP-24', 'System Bot', 'Validation Check', 'Approved', '3 days ago', NOW() - INTERVAL '3 days', TRUE);
+('NGY-26-032', 'SN-455569', 'COMP-24', 'System Bot', 'Validation Check', 'Approved', '3 days ago', NOW() - INTERVAL '3 days', TRUE);
 
 -- Seed Settings
 INSERT INTO settings (key, value) VALUES
