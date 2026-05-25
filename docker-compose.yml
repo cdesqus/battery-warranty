@@ -13,7 +13,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: presales_db
     ports:
-      - "5432:5432" # Allows external connections for DB inspection/management
+      - "5433:5432" # Allows external connections for DB inspection/management
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # Automatically run schema definition and data seeding on first startup
