@@ -1,4 +1,4 @@
-import { Activity, ShieldCheck, Database, Zap, Bot, AlertTriangle } from 'lucide-react';
+import { Activity, ShieldCheck, Database, Zap, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { useData, getBatteryStatus } from '../context/DataContext';
 

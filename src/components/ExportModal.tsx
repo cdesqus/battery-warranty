@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileSpreadsheet, Calendar, CheckCircle2 } from 'lucide-react';
+import { X, FileSpreadsheet, Calendar } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { useData, getBatteryStatus } from '../context/DataContext';
-import type { CompanyAsset } from '../context/DataContext';
 
 interface ExportModalProps {
     isOpen: boolean;

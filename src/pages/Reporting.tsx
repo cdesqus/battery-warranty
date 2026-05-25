@@ -1,5 +1,5 @@
-import { Download, FileSpreadsheet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { useData, getBatteryStatus } from '../context/DataContext';
+import { FileSpreadsheet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useData } from '../context/DataContext';
 import ExportModal from '../components/ExportModal';
 import { useState, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';

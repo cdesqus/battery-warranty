@@ -128,7 +128,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
         const newUnits: any[] = [];
         const duplicates: string[] = [];
 
-        data.forEach((row: any, index: number) => {
+        data.forEach((row: any) => {
             const appId = (row['Application ID'] || row['id'] || '').toString().trim();
             const sn = (row['Serial Number'] || row['sn'] || '').toString().trim().toUpperCase();
             
