@@ -370,6 +370,7 @@ const Dashboard = () => {
                                 <th className="px-3 py-3 text-[10px] font-semibold uppercase text-slate-500 tracking-wider">Serial Number</th>
                                 <th className="px-3 py-3 text-[10px] font-semibold uppercase text-slate-500 tracking-wider">Model</th>
                                 <th className="px-3 py-3 text-[10px] font-semibold uppercase text-slate-500 tracking-wider">Action</th>
+                                <th className="px-3 py-3 text-[10px] font-semibold uppercase text-slate-500 tracking-wider">Operator</th>
                                 <th className="px-3 py-3 text-[10px] font-semibold uppercase text-slate-500 tracking-wider">Timestamp</th>
                                 <th className="px-3 py-3 text-[10px] font-semibold uppercase text-slate-500 tracking-wider text-right">Status</th>
                             </tr>
@@ -389,6 +390,15 @@ const Dashboard = () => {
                                         <td className="px-3 py-3 text-slate-600 font-mono text-[10px]">{unitDetails?.serialNumber || log.serialNumber || '-'}</td>
                                         <td className="px-3 py-3 text-slate-700 font-bold text-[10px] max-w-[140px] truncate">{unitDetails?.batteryModel || 'Unknown Model'}</td>
                                         <td className="px-3 py-3 font-medium text-slate-600 text-xs">{log.action}</td>
+                                        <td className="px-3 py-3 text-slate-600 text-xs">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                log.processedBy === 'System Bot'
+                                                    ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                            }`}>
+                                                {log.processedBy}
+                                            </span>
+                                        </td>
                                         <td className="px-3 py-3 text-slate-500 text-xs">{getRelativeTime(log.date)}</td>
                                         <td className="px-3 py-3 flex justify-end">
                                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold ${log.status === 'Validated' || log.status === 'Approved'

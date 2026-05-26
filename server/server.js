@@ -253,7 +253,7 @@ app.get('/api/activity-logs', async (req, res) => {
   try {
     const result = await query(
       `SELECT unit_id as "id", serial_number as "serialNumber", company_id as "company", 
-              processed_by as "processedBy", action, status, timestamp, date::text as "date", is_bot as "isBot"
+              processed_by as "processedBy", action, status, timestamp, date, is_bot as "isBot"
        FROM activity_logs
        ORDER BY date DESC
        LIMIT 100`
