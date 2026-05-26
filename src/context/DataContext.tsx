@@ -190,14 +190,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [isBackendAvailable, setIsBackendAvailable] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
-    // Initial mount hook: Try to connect to backend health check
+    // Initial mount hook: Try to connect to backend health check and establish background polling
     useEffect(() => {
+        let isMounted = true;
+
         const initData = async () => {
             try {
                 const healthRes = await fetch(`${API_BASE}/health`);
                 if (healthRes.ok) {
-                    console.log('Backend Express API discovered! Loading live corporate states from PostgreSQL DB...');
-                    setIsBackendAvailable(true);
+                    if (isMounted) setIsBackendAvailable(true);
 
                     const [companiesRes, usersRes, logsRes, modelsRes, partnersRes] = await Promise.all([
                         fetch(`${API_BASE}/companies`),
@@ -206,6 +207,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         fetch(`${API_BASE}/settings/models`),
                         fetch(`${API_BASE}/settings/partners`)
                     ]);
+
+                    if (!isMounted) return;
 
                     if (companiesRes.ok) {
                         const companiesData = await companiesRes.json();
@@ -247,10 +250,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } catch (e) {
                 console.log('Backend API not reachable. Operating in standalone sandboxed client mock state.');
             } finally {
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         };
+
         initData();
+
+        // Check and sync database changes every 7 seconds for multi-device real-time consistency
+        const pollInterval = setInterval(() => {
+            initData();
+        }, 7000);
+
+        return () => {
+            isMounted = false;
+            clearInterval(pollInterval);
+        };
     }, []);
 
     // --- State Synchronization Handlers ---
