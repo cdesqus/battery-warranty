@@ -154,7 +154,7 @@ const Layout = () => {
             )}
 
             {/* Sidebar */}
-            <aside className={`bg-[#1A2B4C] text-white flex flex-col hidden md:flex transition-all duration-300 relative select-none shrink-0 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+            <aside className={`bg-[#1A2B4C] text-white flex flex-col hidden md:flex transition-all duration-300 relative select-none shrink-0 overflow-x-hidden ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
                 {/* Header Area */}
                 <div className="p-6 border-b border-slate-700 flex items-center justify-between relative h-[73px]">
                     {!isSidebarCollapsed && (
@@ -173,7 +173,7 @@ const Layout = () => {
                 </div>
 
                 {/* Navigation Links */}
-                <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto custom-scrollbar">
+                <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto overflow-x-hidden custom-scrollbar">
                     <NavLink 
                         to="/" 
                         end 
