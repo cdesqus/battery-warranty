@@ -40,8 +40,7 @@ services:
       DB_PASSWORD: postgres
       DB_NAME: presales_db
     depends_on:
-      db:
-        condition: service_healthy # Wait for DB healthcheck to pass before booting API
+      - db
 
   # 3. Frontend Web Client (served by Nginx)
   frontend:
