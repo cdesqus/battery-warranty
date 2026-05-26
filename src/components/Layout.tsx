@@ -178,7 +178,7 @@ const Layout = () => {
                         <span>Reports</span>
                     </NavLink>
                     {currentUser.role === 'Super Admin' && (
-                        <NavLink to="/settings" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}>
+                        <NavLink to="/settings" state={{ activeTab: 'users' }} className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}>
                             <Settings size={20} />
                             <span>Settings</span>
                         </NavLink>
@@ -239,12 +239,16 @@ const Layout = () => {
                                 )}
                             </button>
                         </div>
-                        <div className="flex items-center gap-2 border-l pl-6 border-slate-200">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
+                        <button 
+                            onClick={() => navigate('/settings', { state: { activeTab: 'profile' } })}
+                            className="flex items-center gap-2 border-l pl-6 border-slate-200 hover:opacity-80 transition-all cursor-pointer group select-none"
+                            title="My Profile"
+                        >
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm group-hover:bg-indigo-200 transition-colors">
                                 {getInitials(currentUser.name)}
                             </div>
-                            <span className="text-sm font-medium text-slate-700">{currentUser.name}</span>
-                        </div>
+                            <span className="text-sm font-bold text-slate-700 group-hover:text-[#1A2B4C] transition-colors">{currentUser.name}</span>
+                        </button>
                     </div>
                 </header>
 

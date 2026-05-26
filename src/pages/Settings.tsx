@@ -1,11 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { User, Shield, Users, Save, Trash2, Key, Mail, Building2, ToggleLeft, ToggleRight, UserPlus, X, Edit2 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import type { SystemUser, UserRole } from '../context/DataContext';
 
 const Settings = () => {
     const { currentUser, setCurrentUser, systemUsers, setSystemUsers } = useData();
-    const [activeTab, setActiveTab] = useState<'profile' | 'users'>('profile');
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState<'profile' | 'users'>('users');
+
+    useEffect(() => {
+        const tab = (location.state as any)?.activeTab;
+        if (tab === 'profile' || tab === 'users') {
+            setActiveTab(tab);
+        } else {
+            setActiveTab('users');
+        }
+    }, [location]);
     const [toast, setToast] = useState<string | null>(null);
 
     // Profile Form State
