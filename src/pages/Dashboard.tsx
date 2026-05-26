@@ -1,14 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Activity, ShieldCheck, Database, Zap, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
-import { useData, getBatteryStatus } from '../context/DataContext';
+import { useData, getBatteryStatus, type ActivityLog } from '../context/DataContext';
 import { getRelativeTime } from '../utils/time';
 
 // Trend data is now calculated dynamically inside the component
 
 const Dashboard = () => {
-    const { activityLogs, getTotalUnits, companies } = useData();
+    const { activityLogs, getTotalUnits, companies, selectedSource, setSelectedSource, sourceChannels } = useData();
     const location = useLocation();
 
     useEffect(() => {
@@ -37,6 +37,8 @@ const Dashboard = () => {
     let allTimeClaims = 0;
 
     companies.forEach(c => c.units.forEach(u => {
+        if (selectedSource !== 'All Partners' && u.sourceChannel !== selectedSource) return;
+
         const s = getBatteryStatus(u.contractStartDate, u.claimCount);
         if (s === 'Active') act++;
         else if (s === 'Expired') exp++;
@@ -71,7 +73,14 @@ const Dashboard = () => {
 
     const topExpiring = expiringSoon.sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5);
 
-    const tot = getTotalUnits() || 1;
+    const totalFilteredUnits = useMemo(() => {
+        if (selectedSource === 'All Partners') return getTotalUnits();
+        return companies.reduce((acc, c) => acc + c.units.filter(u => u.sourceChannel === selectedSource).length, 0);
+    }, [companies, selectedSource, getTotalUnits]);
+
+    const tot = useMemo(() => {
+        return totalFilteredUnits === 0 ? 1 : totalFilteredUnits;
+    }, [totalFilteredUnits]);
     
     // Claim Ratio: Total All-Time Claimed Units / Total Assets
     const claimRatio = ((allTimeClaims / tot) * 100).toFixed(1);
@@ -79,39 +88,51 @@ const Dashboard = () => {
     // Recent Claims (Current Calendar Month Only)
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
-    const monthlyClaimsCount = activityLogs.filter(log => {
-        const logDate = new Date(log.date);
-        return (log.action.includes('Claim') || log.status === 'Approved') && 
-               logDate.getMonth() === currentMonth && 
-               logDate.getFullYear() === currentYear;
-    }).length;
+    const monthlyClaimsCount = useMemo(() => {
+        return activityLogs.filter(log => {
+            if (selectedSource !== 'All Partners') {
+                const unit = companies.flatMap(c => c.units).find(u => u.id === log.id || u.serialNumber === log.serialNumber);
+                if (!unit || unit.sourceChannel !== selectedSource) return false;
+            }
+            const logDate = new Date(log.date);
+            return (log.action.includes('Claim') || log.status === 'Approved') && 
+                   logDate.getMonth() === currentMonth && 
+                   logDate.getFullYear() === currentYear;
+        }).length;
+    }, [activityLogs, selectedSource, companies, currentMonth, currentYear]);
 
     const coveragePercent = ((underWarranty / tot) * 100).toFixed(1);
 
     // Dynamic Monthly Trend Logic (Last 6 Months)
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const now = new Date();
-    const dynamicTrendData = Array.from({ length: 6 }).map((_, i) => {
-        const targetDate = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-        const m = targetDate.getMonth();
-        const y = targetDate.getFullYear();
-        
-        const logsInMonth = activityLogs.filter(log => {
-            const logDate = new Date(log.date);
-            return logDate.getMonth() === m && logDate.getFullYear() === y;
-        });
+    const dynamicTrendData = useMemo(() => {
+        return Array.from({ length: 6 }).map((_, i) => {
+            const targetDate = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+            const m = targetDate.getMonth();
+            const y = targetDate.getFullYear();
+            
+            const logsInMonth = activityLogs.filter(log => {
+                if (selectedSource !== 'All Partners') {
+                    const unit = companies.flatMap(c => c.units).find(u => u.id === log.id || u.serialNumber === log.serialNumber);
+                    if (!unit || unit.sourceChannel !== selectedSource) return false;
+                }
+                const logDate = new Date(log.date);
+                return logDate.getMonth() === m && logDate.getFullYear() === y;
+            });
 
-        return {
-            time: monthNames[m],
-            processed: logsInMonth.filter(l => l.status === 'Approved' || l.status === 'Validated' || l.action.includes('Claim')).length,
-            rejected: logsInMonth.filter(l => l.status.includes('Rejected')).length
-        };
-    });
+            return {
+                time: monthNames[m],
+                processed: logsInMonth.filter(l => l.status === 'Approved' || l.status === 'Validated' || l.action.includes('Claim')).length,
+                rejected: logsInMonth.filter(l => l.status.includes('Rejected')).length
+            };
+        });
+    }, [activityLogs, selectedSource, companies, now, monthNames]);
 
     const dynamicDonut = [
-        { name: 'Active', value: tot === 0 ? 0 : Math.round((act / tot) * 100), color: '#22c55e' },
-        { name: 'Expired', value: tot === 0 ? 0 : Math.round((exp / tot) * 100), color: '#f59e0b' },
-        { name: 'Claimed', value: tot === 0 ? 0 : Math.round((clm / tot) * 100), color: '#ef4444' },
+        { name: 'Active', value: totalFilteredUnits === 0 ? 0 : Math.round((act / totalFilteredUnits) * 100), color: '#22c55e' },
+        { name: 'Expired', value: totalFilteredUnits === 0 ? 0 : Math.round((exp / totalFilteredUnits) * 100), color: '#f59e0b' },
+        { name: 'Claimed', value: totalFilteredUnits === 0 ? 0 : Math.round((clm / totalFilteredUnits) * 100), color: '#ef4444' },
     ];
 
     // Regroup models after cleaning names (remove text in parentheses)
@@ -138,11 +159,31 @@ const Dashboard = () => {
         .sort((a, b) => b.claims - a.claims)
         .slice(0, 5);
 
+    const filteredActivityLogs = useMemo(() => {
+        if (selectedSource === 'All Partners') return activityLogs;
+        return activityLogs.filter(log => {
+            const unit = companies.flatMap(c => c.units).find(u => u.id === log.id || u.serialNumber === log.serialNumber);
+            return unit?.sourceChannel === selectedSource;
+        });
+    }, [activityLogs, selectedSource, companies]);
+
     return (
         <div className="max-w-7xl mx-auto w-full pb-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-800">Executive Dashboard</h1>
-                <p className="text-slate-500 mt-1">High-level overview of system activity and active warranties.</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-800">Executive Dashboard</h1>
+                    <p className="text-slate-500 mt-1">High-level overview of system activity and active warranties.</p>
+                </div>
+                <div className="relative">
+                    <select
+                        value={selectedSource}
+                        onChange={(e) => setSelectedSource(e.target.value)}
+                        className="bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/20 shadow-sm cursor-pointer"
+                    >
+                        <option value="All Partners">All Partners</option>
+                        {sourceChannels.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
             </div>
 
             {/* KPI Widgets */}
@@ -150,7 +191,7 @@ const Dashboard = () => {
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-1">Total Assets</p>
-                        <p className="text-3xl font-black text-slate-800">{getTotalUnits().toLocaleString()}</p>
+                        <p className="text-3xl font-black text-slate-800">{totalFilteredUnits.toLocaleString()}</p>
                     </div>
                     <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600">
                         <Database size={24} />
@@ -224,7 +265,7 @@ const Dashboard = () => {
                     <h3 className="font-bold text-slate-800 text-lg mb-2">Asset Status Distribution</h3>
                     <div className="flex-1 flex justify-center items-center relative min-h-[180px]">
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-2xl font-black text-slate-800">{tot}</span>
+                            <span className="text-2xl font-black text-slate-800">{totalFilteredUnits}</span>
                             <span className="text-[10px] font-bold text-slate-400 uppercase">UNITS</span>
                         </div>
                         <ResponsiveContainer width="100%" height="100%">
@@ -376,7 +417,7 @@ const Dashboard = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {activityLogs.map((log, i) => {
+                            {filteredActivityLogs.map((log: ActivityLog, i: number) => {
                                 // Find unit details from companies list
                                 let unitDetails = null;
                                 for (const c of companies) {

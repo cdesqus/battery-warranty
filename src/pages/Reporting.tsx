@@ -42,7 +42,7 @@ const Reporting = () => {
             if (selectedSource === 'All Partners') return matchesStatus;
             
             // Link log to unit to check source
-            const unit = companies.flatMap(c => c.units).find(u => u.id === log.id);
+            const unit = companies.flatMap(c => c.units).find(u => u.id === log.id || u.serialNumber === log.serialNumber);
             return matchesStatus && unit?.sourceChannel === selectedSource;
         });
         const counts: { [key: string]: number } = {
@@ -57,7 +57,7 @@ const Reporting = () => {
             if (status.includes('expired')) counts['Expired (Auto)']++;
             else if (status.includes('not found') || status.includes('unknown')) counts['Invalid ID (Auto)']++;
             else if (status.includes('claimed')) counts['Already Claimed']++;
-            else if (status.includes('physical damage') || status.includes('manual')) counts['Manual Rejection']++;
+            else if (status.includes('physical damage') || status.includes('manual') || status.includes('damage') || status.includes('error') || status.includes('docs') || status.includes('repair')) counts['Manual Rejection']++;
         });
 
         return Object.entries(counts)
@@ -67,11 +67,81 @@ const Reporting = () => {
 
     const COLORS = ['#1A2B4C', '#F43F5E', '#F59E0B', '#10B981', '#6366F1'];
 
-    // --- 3. Trend Logic for Widgets ---
-    const trends = {
-        registrations: { val: '+12.5%', isUp: true },
-        rejections: { val: '-3.2%', isUp: false }
-    };
+    // --- 3. Trend Logic for Widgets (Calculated Dynamically from Real Data) ---
+    const trends = useMemo(() => {
+        const now = new Date();
+        const currentMonthNum = now.getMonth();
+        const currentYearNum = now.getFullYear();
+
+        const prevMonthDate = new Date(currentYearNum, currentMonthNum - 1, 1);
+        const prevMonthNum = prevMonthDate.getMonth();
+        const prevYearNum = prevMonthDate.getFullYear();
+
+        // 1) Registrations Trend
+        let currentMonthRegs = 0;
+        let prevMonthRegs = 0;
+
+        companies.forEach(c => c.units.forEach(u => {
+            if (selectedSource !== 'All Partners' && u.sourceChannel !== selectedSource) return;
+            const appDate = new Date(u.applicationDate || u.contractStartDate);
+            const appMonth = appDate.getMonth();
+            const appYear = appDate.getFullYear();
+            if (appMonth === currentMonthNum && appYear === currentYearNum) {
+                currentMonthRegs++;
+            } else if (appMonth === prevMonthNum && appYear === prevYearNum) {
+                prevMonthRegs++;
+            }
+        }));
+
+        let regTrendPercent = 0;
+        if (prevMonthRegs > 0) {
+            regTrendPercent = ((currentMonthRegs - prevMonthRegs) / prevMonthRegs) * 100;
+        } else if (currentMonthRegs > 0) {
+            regTrendPercent = 100;
+        }
+
+        // 2) Rejections Trend
+        let currentMonthRejections = 0;
+        let prevMonthRejections = 0;
+
+        activityLogs.forEach(log => {
+            const matchesStatus = log.status.toLowerCase().includes('reject');
+            if (!matchesStatus) return;
+
+            if (selectedSource !== 'All Partners') {
+                const unit = companies.flatMap(c => c.units).find(u => u.id === log.id || u.serialNumber === log.serialNumber);
+                if (!unit || unit.sourceChannel !== selectedSource) return;
+            }
+
+            const logDate = new Date(log.date);
+            const logMonth = logDate.getMonth();
+            const logYear = logDate.getFullYear();
+
+            if (logMonth === currentMonthNum && logYear === currentYearNum) {
+                currentMonthRejections++;
+            } else if (logMonth === prevMonthNum && logYear === prevYearNum) {
+                prevMonthRejections++;
+            }
+        });
+
+        let rejTrendPercent = 0;
+        if (prevMonthRejections > 0) {
+            rejTrendPercent = ((currentMonthRejections - prevMonthRejections) / prevMonthRejections) * 100;
+        } else if (currentMonthRejections > 0) {
+            rejTrendPercent = 100;
+        }
+
+        return {
+            registrations: {
+                val: `${regTrendPercent >= 0 ? '+' : ''}${regTrendPercent.toFixed(1)}%`,
+                isUp: regTrendPercent >= 0
+            },
+            rejections: {
+                val: `${rejTrendPercent >= 0 ? '+' : ''}${rejTrendPercent.toFixed(1)}%`,
+                isUp: rejTrendPercent >= 0
+            }
+        };
+    }, [companies, activityLogs, selectedSource]);
 
     let expiringSoon = 0;
     companies.forEach(c => c.units.forEach(u => {
