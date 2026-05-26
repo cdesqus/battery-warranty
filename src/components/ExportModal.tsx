@@ -10,15 +10,19 @@ interface ExportModalProps {
 }
 
 const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
-    const { companies, selectedSource } = useData();
+    const { companies, sourceChannels } = useData();
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');
+    const [partnerFilter, setPartnerFilter] = useState<string>('All Partners');
+    const [fileFormat, setFileFormat] = useState<'xlsx' | 'csv'>('xlsx');
     const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => {
         if (!isOpen) {
             setStartDate('');
             setEndDate('');
+            setPartnerFilter('All Partners');
+            setFileFormat('xlsx');
         }
     }, [isOpen]);
 
@@ -48,12 +52,68 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
     const generateExport = async () => {
         setIsGenerating(true);
         try {
+            // --- CSV BRANCH ---
+            if (fileFormat === 'csv') {
+                const headers = ['No', 'Application ID', 'Application Date', 'Serial Number', 'Battery Model', 'Unit Price', 'Contract Date', 'End Date', 'Status', 'Partner'];
+                const rows: any[] = [];
+                let seq = 1;
+
+                companies.forEach(comp => {
+                    comp.units.forEach(unit => {
+                        let include = true;
+                        const appDateStr = unit.applicationDate;
+                        
+                        // Strict Application Date filtering
+                        if (!appDateStr) {
+                            include = false;
+                        } else {
+                            const unitDate = new Date(appDateStr);
+                            if (startDate && unitDate < new Date(startDate)) include = false;
+                            if (endDate && unitDate > new Date(endDate)) include = false;
+                        }
+                        
+                        // Partner filtering
+                        if (partnerFilter !== 'All Partners' && unit.sourceChannel !== partnerFilter) include = false;
+
+                        if (include) {
+                            const sDate = new Date(unit.contractStartDate);
+                            const eDate = new Date(sDate);
+                            eDate.setMonth(eDate.getMonth() + 24);
+                            const status = getBatteryStatus(unit.contractStartDate, unit.claimCount).toUpperCase();
+                            const finalPrice = unit.unitPrice * (1 - (unit.discount || 0));
+
+                            rows.push([
+                                seq++,
+                                unit.id,
+                                unit.applicationDate ? new Date(unit.applicationDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+                                unit.serialNumber || '-',
+                                unit.batteryModel,
+                                finalPrice,
+                                sDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                                eDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+                                status,
+                                unit.sourceChannel || 'Direct'
+                            ]);
+                        }
+                    });
+                });
+
+                const csvContent = [
+                    headers.join(','),
+                    ...rows.map(row => row.map((val: any) => `"${val}"`).join(','))
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                saveAs(blob, `Operational_Report_${new Date().toISOString().split('T')[0]}.csv`);
+                onClose();
+                return;
+            }
+
+            // --- XLSX BRANCH ---
             const workbook = new ExcelJS.Workbook();
             const worksheet = workbook.addWorksheet('Application Report');
 
-            // --- 1. TOP HEADER (Rows 1-4) ---
-
-            // Row 1: Large Title
+            // Merged header
             worksheet.mergeCells('A1:J1');
             const titleRow = worksheet.getRow(1);
             titleRow.getCell(1).value = 'FIELD REPORT APPLICATION DISTRIBUTOR UNIT';
@@ -61,19 +121,19 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
             titleRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
             titleRow.height = 35;
 
-            // Row 2: Company (Empty)
+            // Company row
             worksheet.mergeCells('A2:J2');
             const companyCell = worksheet.getCell('A2');
             companyCell.value = {
                 richText: [
                     { text: 'Company: ', font: { bold: true } },
-                    { text: '...................................................' }
+                    { text: 'All Registered Corporate Entities' }
                 ]
             };
             companyCell.alignment = { horizontal: 'left', vertical: 'middle' };
             worksheet.getRow(2).height = 20;
 
-            // Row 3: Period (Dynamic)
+            // Period row
             worksheet.mergeCells('A3:J3');
             const periodCell = worksheet.getCell('A3');
             const startStr = startDate ? new Date(startDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : null;
@@ -82,18 +142,18 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
             
             periodCell.value = {
                 richText: [
-                    { text: 'Period: ', font: { bold: true } },
-                    { text: periodValue }
+                    { text: 'Period (Application Date): ', font: { bold: true } },
+                    { text: periodValue },
+                    { text: '  |  Partner: ', font: { bold: true } },
+                    { text: partnerFilter }
                 ]
             };
             periodCell.alignment = { horizontal: 'left', vertical: 'middle' };
             worksheet.getRow(3).height = 20;
 
-            // Row 4: Blank Spacer
+            // Spacer
             worksheet.getRow(4).height = 15;
 
-            // --- 2. DATA TABLE COLUMNS (Starting Row 5) ---
-            // No -> Application ID -> Application Date -> Type Unit -> Serial Number -> Units -> Unit Price -> Contract Date -> End Date -> Status
             const columnDefinitions = [
                 { header: 'No', key: 'no', width: 6 },
                 { header: 'Application ID', key: 'appId', width: 25 },
@@ -104,6 +164,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                 { header: 'Contract Date', key: 'start', width: 18 },
                 { header: 'End Date', key: 'end', width: 18 },
                 { header: 'Status', key: 'status', width: 15 },
+                { header: 'Partner', key: 'partner', width: 18 },
             ];
 
             worksheet.columns = columnDefinitions.map(col => ({
@@ -133,19 +194,24 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
             });
             headerRow.height = 25;
 
-            // --- Data Selection ---
-            const baseData = companies;
-
-            // --- Add Data Rows ---
             let rowCounter = 6;
             let sequenceNo = 1;
-            baseData.forEach(comp => {
+            companies.forEach(comp => {
                 comp.units.forEach(unit => {
-                    const unitDate = new Date(unit.applicationDate || unit.contractStartDate);
                     let include = true;
-                    if (startDate && unitDate < new Date(startDate)) include = false;
-                    if (endDate && unitDate > new Date(endDate)) include = false;
-                    if (selectedSource !== 'All Partners' && unit.sourceChannel !== selectedSource) include = false;
+                    const appDateStr = unit.applicationDate;
+                    
+                    // Strict Application Date filtering
+                    if (!appDateStr) {
+                        include = false;
+                    } else {
+                        const unitDate = new Date(appDateStr);
+                        if (startDate && unitDate < new Date(startDate)) include = false;
+                        if (endDate && unitDate > new Date(endDate)) include = false;
+                    }
+                    
+                    // Partner filtering
+                    if (partnerFilter !== 'All Partners' && unit.sourceChannel !== partnerFilter) include = false;
 
                     if (include) {
                         const sDate = new Date(unit.contractStartDate);
@@ -162,7 +228,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                             price: unit.unitPrice * (1 - (unit.discount || 0)),
                             start: sDate,
                             end: eDate,
-                            status: status.toUpperCase()
+                            status: status.toUpperCase(),
+                            partner: unit.sourceChannel || 'Direct'
                         };
 
                         const row = worksheet.addRow(rowValues);
@@ -176,7 +243,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                             };
 
                             const key = columnDefinitions[colNumber - 1].key;
-                            if (['no', 'appId', 'appDate', 'start', 'end', 'status'].includes(key)) {
+                            if (['no', 'appId', 'appDate', 'start', 'end', 'status', 'partner'].includes(key)) {
                                 cell.alignment = { vertical: 'middle', horizontal: 'center' };
                             } else if (key === 'price') {
                                 cell.alignment = { vertical: 'middle', horizontal: 'right' };
@@ -194,7 +261,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                 });
             });
 
-            // --- 3. THE 'TOTAL' ROW ---
+            // Grand Total
             const totalRowIndex = rowCounter;
             worksheet.mergeCells(`A${totalRowIndex}:E${totalRowIndex}`); 
             const grandTotalRow = worksheet.getRow(totalRowIndex);
@@ -209,7 +276,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                 fgColor: { argb: 'FF10B981' } 
             };
 
-            const totalSumCell = grandTotalRow.getCell(6); // Column F (Unit Price)
+            const totalSumCell = grandTotalRow.getCell(6); 
             totalSumCell.value = {
                 formula: `=SUM(F6:F${totalRowIndex - 1})`,
                 date1904: false
@@ -223,8 +290,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
             };
             totalSumCell.alignment = { horizontal: 'right', vertical: 'middle' };
 
-            // Fill the rest of the row with green
-            for(let i=7; i<=9; i++) {
+            for(let i=7; i<=10; i++) {
                 const cell = grandTotalRow.getCell(i);
                 cell.fill = {
                     type: 'pattern',
@@ -233,13 +299,12 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                 };
             }
 
-            // Freeze the top 5 rows
             worksheet.views = [
                 { state: 'frozen', xSplit: 0, ySplit: 5 }
             ];
 
             const buffer = await workbook.xlsx.writeBuffer();
-            const fileName = `Professional_Flat_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+            const fileName = `Operational_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
             saveAs(new Blob([buffer]), fileName);
 
             onClose();
@@ -251,18 +316,17 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
         }
     };
 
-
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div className="flex items-center gap-3">
-                        <div className="bg-[#1A2B4C] p-2.5 rounded-xl text-white shadow-lg">
+                        <div className="bg-[#1A2B4C] p-2.5 rounded-xl text-white shadow-lg animate-pulse">
                             <FileSpreadsheet size={24} />
                         </div>
                         <div>
-                            <h3 className="font-black text-slate-800 text-xl tracking-tight uppercase">Professional Export</h3>
-                            <p className="text-slate-500 text-xs font-medium mt-0.5">Generate unit-focused flat reports (.xlsx)</p>
+                            <h3 className="font-black text-slate-800 text-lg tracking-tight uppercase">Export Operational Report</h3>
+                            <p className="text-slate-500 text-xs font-semibold mt-0.5">Generate unit-focused flat reports (.xlsx / .csv)</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-all">
@@ -270,12 +334,13 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                     </button>
                 </div>
 
-                <div className="p-8 space-y-8 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                <div className="p-8 space-y-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
 
-                    <div className="space-y-4">
+                    {/* Select Application Date Range */}
+                    <div className="space-y-3">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                            Export Filters (Date Range)
+                            Select Application Date Range
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
@@ -286,7 +351,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                                         type="date"
                                         value={startDate}
                                         onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full border-2 border-slate-100 rounded-xl pl-11 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1A2B4C] bg-slate-50/50 font-bold text-slate-700"
+                                        className="w-full border-2 border-slate-100 rounded-xl pl-11 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1A2B4C] bg-slate-50/50 font-bold text-slate-700 transition-all"
                                     />
                                 </div>
                             </div>
@@ -298,17 +363,72 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full border-2 border-slate-100 rounded-xl pl-11 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1A2B4C] bg-slate-50/50 font-bold text-slate-700"
+                                        className="w-full border-2 border-slate-100 rounded-xl pl-11 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#1A2B4C] bg-slate-50/50 font-bold text-slate-700 transition-all"
                                     />
                                 </div>
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => handlePresetRange('today')} className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors">Today</button>
-                            <button onClick={() => handlePresetRange('week')} className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors">This Week</button>
-                            <button onClick={() => handlePresetRange('month')} className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors">This Month</button>
+                            <button onClick={() => handlePresetRange('today')} className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold hover:bg-[#1A2B4C] hover:text-white transition-all">Today</button>
+                            <button onClick={() => handlePresetRange('week')} className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold hover:bg-[#1A2B4C] hover:text-white transition-all">This Week</button>
+                            <button onClick={() => handlePresetRange('month')} className="px-4 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold hover:bg-[#1A2B4C] hover:text-white transition-all">This Month</button>
                         </div>
                     </div>
+
+                    {/* Select Partner Dropdown */}
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            Select Partner
+                        </label>
+                        <select
+                            value={partnerFilter}
+                            onChange={(e) => setPartnerFilter(e.target.value)}
+                            className="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#1A2B4C] bg-slate-50/50 font-bold text-slate-700 transition-all"
+                        >
+                            <option value="All Partners">All Partners</option>
+                            {sourceChannels.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* File Format Selection */}
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            File Format
+                        </label>
+                        <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 pt-1">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <input
+                                    type="radio"
+                                    name="fileFormat"
+                                    value="xlsx"
+                                    checked={fileFormat === 'xlsx'}
+                                    onChange={() => setFileFormat('xlsx')}
+                                    className="w-4.5 h-4.5 accent-[#1A2B4C] cursor-pointer"
+                                />
+                                <span className={`text-sm font-bold transition-all ${fileFormat === 'xlsx' ? 'text-[#1A2B4C]' : 'text-slate-500 group-hover:text-slate-700'}`}>
+                                    .XLSX (Excel Spreadsheet)
+                                </span>
+                            </label>
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <input
+                                    type="radio"
+                                    name="fileFormat"
+                                    value="csv"
+                                    checked={fileFormat === 'csv'}
+                                    onChange={() => setFileFormat('csv')}
+                                    className="w-4.5 h-4.5 accent-[#1A2B4C] cursor-pointer"
+                                />
+                                <span className={`text-sm font-bold transition-all ${fileFormat === 'csv' ? 'text-[#1A2B4C]' : 'text-slate-500 group-hover:text-slate-700'}`}>
+                                    .CSV (Comma Separated Values)
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex gap-3">
@@ -318,7 +438,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                         disabled={isGenerating}
                         className={`flex-[2] px-6 py-3.5 rounded-xl text-white font-black text-sm transition-all flex items-center justify-center gap-2 uppercase tracking-widest ${isGenerating ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#1A2B4C] hover:bg-[#253e6b] shadow-xl'}`}
                     >
-                        {isGenerating ? 'Generating...' : 'Download Report (.xlsx)'}
+                        {isGenerating ? 'Generating...' : 'Generate & Download'}
                     </button>
                 </div>
             </div>
