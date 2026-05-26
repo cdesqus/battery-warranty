@@ -7,17 +7,43 @@ import type { SystemUser, UserRole } from '../context/DataContext';
 const Settings = () => {
     const { currentUser, setCurrentUser, systemUsers, setSystemUsers } = useData();
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState<'profile' | 'users'>('users');
+    const [activeTab, setActiveTab] = useState<'profile' | 'users' | 'maintenance'>('users');
 
     useEffect(() => {
         const tab = (location.state as any)?.activeTab;
-        if (tab === 'profile' || tab === 'users') {
+        if (tab === 'profile' || tab === 'users' || tab === 'maintenance') {
             setActiveTab(tab);
         } else {
             setActiveTab('users');
         }
     }, [location]);
     const [toast, setToast] = useState<string | null>(null);
+
+    const handleResetDatabase = async () => {
+        if (!window.confirm("WARNING: Are you sure you want to WIPE all unit serial numbers and claim logs from the PostgreSQL database? This is necessary so you can import your Excel file cleanly without database unique-key conflicts. This operation is irreversible!")) {
+            return;
+        }
+
+        try {
+            const API_BASE = '/api';
+            const response = await fetch(`${API_BASE}/settings/reset`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                showToast('Database wiped clean successfully!');
+                setTimeout(() => {
+                    window.location.href = '/master-data';
+                }, 1000);
+            } else {
+                alert('Failed to reset database.');
+            }
+        } catch (err) {
+            console.error('Reset database failed:', err);
+            alert('An error occurred while resetting the database.');
+        }
+    };
 
     // Profile Form State
     const [profileForm, setProfileForm] = useState({
@@ -118,7 +144,7 @@ const Settings = () => {
                 <p className="text-slate-500 mt-1">Manage your identity and administrative access control.</p>
             </div>
 
-            <div className="flex gap-2 bg-slate-200/50 p-1.5 rounded-2xl mb-8 w-fit border border-slate-200 shadow-sm relative z-30">
+            <div className="flex gap-2 bg-slate-200/50 p-1.5 rounded-2xl mb-8 w-fit border border-slate-200 shadow-sm relative z-30 flex-wrap">
                 <button 
                     type="button"
                     onClick={() => {
@@ -149,6 +175,20 @@ const Settings = () => {
                     <Users size={18} className={activeTab === 'users' ? 'text-[#1A2B4C]' : 'text-slate-400'} /> 
                     User Management
                 </button>
+                {currentUser.role === 'Super Admin' && (
+                    <button 
+                        type="button"
+                        onClick={() => setActiveTab('maintenance')}
+                        className={`flex items-center gap-2 px-8 py-3 rounded-xl font-black text-sm transition-all duration-200 cursor-pointer select-none ${
+                            activeTab === 'maintenance' 
+                            ? 'bg-red-600 text-white shadow-md shadow-red-500/20' 
+                            : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                        }`}
+                    >
+                        <Trash2 size={18} className={activeTab === 'maintenance' ? 'text-white' : 'text-red-400'} /> 
+                        Reset Database
+                    </button>
+                )}
             </div>
 
             {activeTab === 'profile' ? (
@@ -243,6 +283,44 @@ const Settings = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            ) : activeTab === 'maintenance' ? (
+                <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden animate-in fade-in duration-200">
+                    <div className="p-8">
+                        <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
+                            <div className="bg-red-100 p-3 rounded-xl text-red-600 shadow-inner">
+                                <Trash2 size={28} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Database Reset & Clean Utility</h3>
+                                <p className="text-slate-500 text-xs font-semibold mt-0.5">Wipe clean mock/seeded records to prepare system for production excel data imports.</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-red-50 border border-red-100 rounded-xl p-6 text-sm text-red-800 space-y-3 mb-8">
+                            <h4 className="font-black uppercase tracking-wider flex items-center gap-2">⚠️ Warning: Crucial Operation</h4>
+                            <p className="font-semibold leading-relaxed">
+                                Resetting the database will permanently delete all units, claim activity logs, and custom master data. 
+                                Default corporate partners and models will be preserved, and the default system users (Super Admin accounts) will NOT be deleted. 
+                                This operation is irreversible.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between p-6 bg-slate-50 border border-slate-100 rounded-2xl flex-wrap gap-4">
+                            <div>
+                                <p className="font-black text-slate-800 text-sm">WIPE ALL ASSETS & LOGS</p>
+                                <p className="text-xs text-slate-500 font-semibold mt-1">Deletes all claims, unit serial numbers, and logs from PostgreSQL.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleResetDatabase}
+                                className="bg-red-600 hover:bg-red-700 text-white font-black text-sm px-6 py-3.5 rounded-xl shadow-lg shadow-red-500/20 transition-all uppercase tracking-wider flex items-center gap-2 cursor-pointer select-none"
+                            >
+                                <Trash2 size={16} />
+                                Wipe Database Clean
+                            </button>
+                        </div>
                     </div>
                 </div>
             ) : (

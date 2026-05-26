@@ -358,6 +358,17 @@ app.post('/api/settings/partners', async (req, res) => {
   }
 });
 
+// 13d. RESET SYSTEM DATA (Truncate units and activity logs for fresh imports)
+app.post('/api/settings/reset', async (req, res) => {
+  try {
+    await query('TRUNCATE TABLE units, activity_logs CASCADE');
+    res.json({ message: 'Database reset successfully' });
+  } catch (error) {
+    console.error('Error resetting database:', error);
+    res.status(500).json({ error: 'Failed to reset database' });
+  }
+});
+
 // 14. AUTH LOGIN
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
