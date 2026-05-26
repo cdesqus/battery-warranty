@@ -411,17 +411,44 @@ app.post('/api/auth/login', async (req, res) => {
 const runMigrations = async () => {
   try {
     console.log('Running backend database self-migrations...');
+    
+    // Ensure table structure has password column
     await query(`
       ALTER TABLE system_users ADD COLUMN IF NOT EXISTS password VARCHAR(255) NOT NULL DEFAULT 'password123';
     `);
     
-    // Sync default passwords for the seeded users
-    await query(`
-      UPDATE system_users SET password = 'rahma123' WHERE email = 'rahma@presales.com';
-      UPDATE system_users SET password = 'alex123' WHERE email = 'alex@admin.com';
-      UPDATE system_users SET password = 'sarah123' WHERE email = 'sarah@viewer.com';
-      UPDATE system_users SET password = 'rudi123' WHERE email = 'rudi.h@admin.com';
-    `);
+    // Auto-Heal & Seed default users if they are missing or table is empty
+    const userCheck = await query("SELECT COUNT(*) FROM system_users");
+    const userCount = parseInt(userCheck.rows[0].count, 10);
+    
+    if (userCount === 0) {
+      console.log('Database system_users table is empty! Seeding default administrative accounts...');
+      await query(`
+        INSERT INTO system_users (id, name, email, password, role, status, last_login) VALUES
+        ('USR-001', 'Nur Rahma Atika', 'rahma@presales.com', 'rahma123', 'Super Admin', 'Active', 'Just now'),
+        ('USR-002', 'Alex Rivera', 'alex@admin.com', 'alex123', 'Admin', 'Active', '2 hours ago'),
+        ('USR-003', 'Siti Sarah', 'sarah@viewer.com', 'sarah123', 'Viewer', 'Active', '1 day ago'),
+        ('USR-004', 'Rudi Hartono', 'rudi.h@admin.com', 'rudi123', 'Admin', 'Inactive', '3 days ago');
+      `);
+    } else {
+      // Ensure rahma@presales.com specifically exists as Super Admin
+      const rahmaCheck = await query("SELECT * FROM system_users WHERE email = 'rahma@presales.com'");
+      if (rahmaCheck.rowCount === 0) {
+        console.log('Super Admin rahma@presales.com is missing. Seeding Super Admin account...');
+        await query(`
+          INSERT INTO system_users (id, name, email, password, role, status, last_login) VALUES
+          ('USR-001', 'Nur Rahma Atika', 'rahma@presales.com', 'rahma123', 'Super Admin', 'Active', 'Just now');
+        `);
+      } else {
+        // Guarantee password sync
+        await query(`
+          UPDATE system_users SET password = 'rahma123' WHERE email = 'rahma@presales.com';
+          UPDATE system_users SET password = 'alex123' WHERE email = 'alex@admin.com';
+          UPDATE system_users SET password = 'sarah123' WHERE email = 'sarah@viewer.com';
+          UPDATE system_users SET password = 'rudi123' WHERE email = 'rudi.h@admin.com';
+        `);
+      }
+    }
 
     // Seed default partners in settings
     await query(`
@@ -429,7 +456,7 @@ const runMigrations = async () => {
       VALUES ('partners', '["Source 1", "Source 2", "Source 3", "Source 4"]')
       ON CONFLICT (key) DO NOTHING;
     `);
-    console.log('Database self-migrations completed successfully.');
+    console.log('Database self-migrations and seeding completed successfully.');
   } catch (err) {
     console.error('Database self-migration failed/skipped:', err.message);
   }
