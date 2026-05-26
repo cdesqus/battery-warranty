@@ -132,8 +132,17 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
         const duplicates: string[] = [];
 
         data.forEach((row: any) => {
-            const appId = (row['Application ID'] || row['id'] || '').toString().trim();
-            const sn = (row['Serial Number'] || row['sn'] || '').toString().trim().toUpperCase();
+            // Support extensive English and Indonesian column name variations
+            const appId = (
+                row['Application ID'] || row['ApplicationId'] || row['application_id'] || 
+                row['ID'] || row['id'] || row['App ID'] || row['appId'] || ''
+            ).toString().trim();
+            
+            const sn = (
+                row['Serial Number'] || row['SerialNumber'] || row['serial_number'] || 
+                row['SN'] || row['sn'] || row['No. Serial'] || row['No Serial'] || 
+                row['Serial No'] || row['SerialNo'] || ''
+            ).toString().trim().toUpperCase();
             
             // SKIP EMPTY OR BLANK ROWS
             if (!sn && !appId) {
@@ -155,16 +164,25 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
                 return;
             }
 
-            // Map columns
+            // Map other columns with robust fallbacks
+            const rawModel = row['Battery Model'] || row['BatteryModel'] || row['battery_model'] || row['Model'] || row['model'] || row['Tipe'] || row['Tipe Baterai'] || 'Unknown';
+            const rawAppDate = row['Application Date'] || row['ApplicationDate'] || row['application_date'] || row['App Date'] || row['appDate'] || row['Tanggal'];
+            const rawStartDate = row['Contract Start Date'] || row['ContractStartDate'] || row['contract_start_date'] || row['Start Date'] || row['startDate'] || row['Mulai Kontrak'];
+            const rawPrice = row['Unit Price'] || row['UnitPrice'] || row['unit_price'] || row['Price'] || row['price'] || row['Harga'] || '0';
+            const rawDiscount = row['Discount (%)'] || row['Discount'] || row['discount'] || row['DiscountPercent'] || row['Diskon'] || '0';
+
+            const parsedPrice = parseFloat(rawPrice.toString().replace(/[^0-9.-]/g, ''));
+            const parsedDiscount = parseFloat(rawDiscount.toString().replace(/[^0-9.-]/g, ''));
+
             const shortId = Math.random().toString(36).substring(2, 8).toUpperCase();
             const unit = {
                 id: appId || `IMP-${shortId}`,
                 serialNumber: sn,
-                batteryModel: (row['Battery Model'] || row['model'] || 'Unknown').toString().trim(),
-                applicationDate: parseExcelDate(row['Application Date'] || row['appDate']),
-                contractStartDate: parseExcelDate(row['Contract Start Date'] || row['startDate']),
-                unitPrice: parseFloat(row['Unit Price'] || row['price'] || '0'),
-                discount: parseFloat(row['Discount (%)'] || row['discount'] || '0') / 100,
+                batteryModel: rawModel.toString().trim(),
+                applicationDate: parseExcelDate(rawAppDate),
+                contractStartDate: parseExcelDate(rawStartDate),
+                unitPrice: isNaN(parsedPrice) ? 0 : parsedPrice,
+                discount: (isNaN(parsedDiscount) ? 0 : parsedDiscount) / 100,
                 claimCount: 0,
                 sourceChannel: selectedChannel
             };
@@ -172,6 +190,12 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
             newUnits.push(unit);
             existingSNs.add(sn); // Prevent duplicates within the same file
         });
+
+        if (newUnits.length === 0) {
+            setError('Import failed: No valid assets found. Please make sure the column headers in your file match the required template.');
+            setIsProcessing(false);
+            return;
+        }
 
         if (duplicates.length > 0) {
             setError(`Import failed: ${duplicates.length} duplicate Serial Number(s) found. Examples: ${duplicates.slice(0, 3).join(', ')}`);
