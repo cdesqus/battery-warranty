@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, ShieldCheck, BarChart3, Settings, Bell, CircleUser, X, AlertTriangle, ShieldAlert, History, LogOut } from 'lucide-react';
+import { LayoutDashboard, Database, ShieldCheck, BarChart3, Settings, Bell, CircleUser, X, AlertTriangle, ShieldAlert, History, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 const Layout = () => {
@@ -33,6 +33,7 @@ const Layout = () => {
     };
 
     const [showNotifications, setShowNotifications] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     // Derived Notifications Logic
     const notifications = [
@@ -152,61 +153,170 @@ const Layout = () => {
             )}
 
             {/* Sidebar */}
-            <aside className="w-64 bg-[#1A2B4C] text-white flex flex-col hidden md:flex">
-                <div className="p-6 border-b border-slate-700">
-                    <h1 className="text-xl font-bold tracking-wider">PRESALES PRO</h1>
-                    <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest">Enterprise System</p>
+            <aside className={`bg-[#1A2B4C] text-white flex flex-col hidden md:flex transition-all duration-300 relative select-none shrink-0 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+                {/* Header Area */}
+                <div className="p-6 border-b border-slate-700 flex items-center justify-between relative h-[73px]">
+                    {!isSidebarCollapsed && (
+                        <div className="animate-in fade-in duration-300">
+                            <h1 className="text-xl font-bold tracking-wider text-white">PRESALES PRO</h1>
+                            <p className="text-xs text-slate-400 mt-0.5 uppercase tracking-widest font-semibold">Enterprise System</p>
+                        </div>
+                    )}
+                    <button 
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        className={`p-2 hover:bg-white/10 rounded-xl transition-all text-slate-300 hover:text-white ${isSidebarCollapsed ? 'mx-auto' : 'absolute right-4 top-1/2 -translate-y-1/2'}`}
+                        title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                    >
+                        {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    </button>
                 </div>
 
-                <nav className="flex-1 py-6 px-4 space-y-2">
-                    <NavLink to="/" end className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}>
-                        <LayoutDashboard size={20} />
-                        <span>Dashboard</span>
+                {/* Navigation Links */}
+                <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto custom-scrollbar">
+                    <NavLink 
+                        to="/" 
+                        end 
+                        className={({ isActive }) => `flex items-center rounded-lg transition-colors ${
+                            isSidebarCollapsed 
+                            ? 'justify-center p-3 relative group' 
+                            : 'gap-3 px-4 py-3'
+                        } ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}
+                    >
+                        <LayoutDashboard size={20} className="shrink-0" />
+                        {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">Dashboard</span>}
+                        {isSidebarCollapsed && (
+                            <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
+                                Dashboard
+                            </div>
+                        )}
                     </NavLink>
-                    <NavLink to="/master-data" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}>
-                        <Database size={20} />
-                        <span>Master Data</span>
+
+                    <NavLink 
+                        to="/master-data" 
+                        className={({ isActive }) => `flex items-center rounded-lg transition-colors ${
+                            isSidebarCollapsed 
+                            ? 'justify-center p-3 relative group' 
+                            : 'gap-3 px-4 py-3'
+                        } ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}
+                    >
+                        <Database size={20} className="shrink-0" />
+                        {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">Master Data</span>}
+                        {isSidebarCollapsed && (
+                            <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
+                                Master Data
+                            </div>
+                        )}
                     </NavLink>
+
                     {currentUser.role !== 'Viewer' && (
-                        <NavLink to="/warranty" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}>
-                            <ShieldCheck size={20} />
-                            <span>Warranty Center</span>
+                        <NavLink 
+                            to="/warranty" 
+                            className={({ isActive }) => `flex items-center rounded-lg transition-colors ${
+                                isSidebarCollapsed 
+                                ? 'justify-center p-3 relative group' 
+                                : 'gap-3 px-4 py-3'
+                            } ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}
+                        >
+                            <ShieldCheck size={20} className="shrink-0" />
+                            {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">Warranty Center</span>}
+                            {isSidebarCollapsed && (
+                                <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
+                                    Warranty Center
+                                </div>
+                            )}
                         </NavLink>
                     )}
-                    <NavLink to="/reporting" className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}>
-                        <BarChart3 size={20} />
-                        <span>Reports</span>
+
+                    <NavLink 
+                        to="/reporting" 
+                        className={({ isActive }) => `flex items-center rounded-lg transition-colors ${
+                            isSidebarCollapsed 
+                            ? 'justify-center p-3 relative group' 
+                            : 'gap-3 px-4 py-3'
+                        } ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}
+                    >
+                        <BarChart3 size={20} className="shrink-0" />
+                        {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">Reports</span>}
+                        {isSidebarCollapsed && (
+                            <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
+                                Reports
+                            </div>
+                        )}
                     </NavLink>
+
                     {currentUser.role === 'Super Admin' && (
-                        <NavLink to="/settings" state={{ activeTab: 'users' }} className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}>
-                            <Settings size={20} />
-                            <span>Settings</span>
+                        <NavLink 
+                            to="/settings" 
+                            state={{ activeTab: 'users' }} 
+                            className={({ isActive }) => `flex items-center rounded-lg transition-colors ${
+                                isSidebarCollapsed 
+                                ? 'justify-center p-3 relative group' 
+                                : 'gap-3 px-4 py-3'
+                            } ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}
+                        >
+                            <Settings size={20} className="shrink-0" />
+                            {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">Settings</span>}
+                            {isSidebarCollapsed && (
+                                <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
+                                    Settings
+                                </div>
+                            )}
                         </NavLink>
                     )}
                 </nav>
 
+                {/* Bottom User Area */}
                 <div className="p-4 border-t border-slate-700 bg-[#14223d]">
-                    <div className="flex items-center justify-between px-2 py-2">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center overflow-hidden">
+                    {isSidebarCollapsed ? (
+                        <div className="flex flex-col items-center gap-4 py-2 px-1">
+                            <button 
+                                onClick={() => navigate('/settings', { state: { activeTab: 'profile' } })}
+                                className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-indigo-400 transition-all group relative cursor-pointer"
+                            >
                                 <CircleUser size={24} className="text-slate-300" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-semibold">{currentUser.name}</p>
-                                <p className="text-xs text-slate-400">{currentUser.role}</p>
-                            </div>
+                                <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
+                                    My Profile
+                                </div>
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    logout();
+                                    navigate('/login');
+                                }}
+                                className="p-2 text-slate-400 hover:text-rose-400 hover:bg-white/5 rounded-xl transition-all cursor-pointer group relative"
+                            >
+                                <LogOut size={18} />
+                                <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
+                                    Log Out
+                                </div>
+                            </button>
                         </div>
-                        <button 
-                            onClick={() => {
-                                logout();
-                                navigate('/login');
-                            }}
-                            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                            title="Log Out"
-                        >
-                            <LogOut size={18} />
-                        </button>
-                    </div>
+                    ) : (
+                        <div className="flex items-center justify-between px-2 py-2">
+                            <button 
+                                onClick={() => navigate('/settings', { state: { activeTab: 'profile' } })}
+                                className="flex items-center gap-3 text-left group hover:opacity-80 transition-all cursor-pointer"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center overflow-hidden">
+                                    <CircleUser size={24} className="text-slate-300" />
+                                </div>
+                                <div className="animate-in fade-in duration-300">
+                                    <p className="text-sm font-semibold text-white group-hover:text-indigo-300 transition-colors">{currentUser.name}</p>
+                                    <p className="text-xs text-slate-400">{currentUser.role}</p>
+                                </div>
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    logout();
+                                    navigate('/login');
+                                }}
+                                className="p-2 text-slate-400 hover:text-rose-400 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                title="Log Out"
+                            >
+                                <LogOut size={18} />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </aside>
 
