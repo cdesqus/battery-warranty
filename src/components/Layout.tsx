@@ -62,11 +62,14 @@ const Layout = () => {
             log.status.includes('Rejected') || 
             log.status.includes('Expired')
         ).map(log => {
-            const sourceId = log.company.startsWith('COMP-') ? `Source ${log.company.replace('COMP-', '')}` : log.company;
+            const unit = companies.flatMap(c => c.units).find(u => u.id === log.id || u.serialNumber === log.serialNumber);
+            const company = companies.find(c => c.id === log.company || c.units.some(u => u.id === log.id));
+            const partnerName = unit?.sourceChannel || 'Direct Channel';
+            const companyName = company?.companyName || 'Corporate Client';
             return {
                 id: `log-${log.id}-${log.timestamp}`,
                 title: log.action.includes('Claim') ? 'Asset Claim Processed' : 'Policy Violation Blocked',
-                description: `Unit ${log.id} (SN: ${log.serialNumber || 'N/A'}) from ${sourceId} is marked as ${log.status}.`,
+                description: `Unit ${log.id} (SN: ${log.serialNumber || 'N/A'}) from ${partnerName} (${companyName}) is marked as ${log.status}.`,
                 type: log.status.includes('Rejected') ? 'REJECT' : 'CLAIM',
                 timestamp: log.timestamp
             };
@@ -137,7 +140,7 @@ const Layout = () => {
                             <button 
                                 onClick={() => {
                                     setShowNotifications(false);
-                                    navigate('/');
+                                    navigate('/', { state: { scrollToLogs: true } });
                                 }}
                                 className="w-full py-3 text-xs font-black text-[#1A2B4C] hover:bg-white rounded-xl border border-slate-200 transition-all uppercase tracking-widest shadow-sm"
                             >

@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Activity, ShieldCheck, Database, Zap, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { useData, getBatteryStatus } from '../context/DataContext';
@@ -6,6 +8,19 @@ import { useData, getBatteryStatus } from '../context/DataContext';
 
 const Dashboard = () => {
     const { activityLogs, getTotalUnits, companies } = useData();
+    const location = useLocation();
+
+    useEffect(() => {
+        if (location.state && (location.state as any).scrollToLogs) {
+            setTimeout(() => {
+                const element = document.getElementById('activity-logs-section');
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    window.history.replaceState({}, document.title);
+                }
+            }, 100);
+        }
+    }, [location]);
 
     // Calculate Asset Status Distribution
     let act = 0, exp = 0, clm = 0;
@@ -341,7 +356,7 @@ const Dashboard = () => {
             </div>
 
             {/* Bottom Section: Activity Log Table */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+            <div id="activity-logs-section" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6 scroll-mt-6">
                 <div className="px-6 py-5 border-b border-slate-200 bg-slate-50">
                     <h3 className="font-bold text-slate-800">Recent System Activity Log</h3>
                     <p className="text-xs text-slate-500 mt-1">Real-time trace of automated enforcement responses.</p>
