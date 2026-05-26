@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Activity, ShieldCheck, Database, Zap, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { useData, getBatteryStatus } from '../context/DataContext';
+import { getRelativeTime } from '../utils/time';
 
 // Trend data is now calculated dynamically inside the component
 
@@ -388,7 +389,7 @@ const Dashboard = () => {
                                         <td className="px-3 py-3 text-slate-600 font-mono text-[10px]">{unitDetails?.serialNumber || log.serialNumber || '-'}</td>
                                         <td className="px-3 py-3 text-slate-700 font-bold text-[10px] max-w-[140px] truncate">{unitDetails?.batteryModel || 'Unknown Model'}</td>
                                         <td className="px-3 py-3 font-medium text-slate-600 text-xs">{log.action}</td>
-                                        <td className="px-3 py-3 text-slate-500 text-xs">{log.timestamp}</td>
+                                        <td className="px-3 py-3 text-slate-500 text-xs">{getRelativeTime(log.date)}</td>
                                         <td className="px-3 py-3 flex justify-end">
                                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold ${log.status === 'Validated' || log.status === 'Approved'
                                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'

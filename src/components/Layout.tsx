@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Database, ShieldCheck, BarChart3, Settings, Bell, CircleUser, X, AlertTriangle, ShieldAlert, History, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useData } from '../context/DataContext';
+import { getRelativeTime } from '../utils/time';
 
 const Layout = () => {
     const location = useLocation();
@@ -68,11 +69,11 @@ const Layout = () => {
             const partnerName = unit?.sourceChannel || 'Direct Channel';
             const companyName = company?.companyName || 'Corporate Client';
             return {
-                id: `log-${log.id}-${log.timestamp}`,
+                id: `log-${log.id}-${getRelativeTime(log.date)}`,
                 title: log.action.includes('Claim') ? 'Asset Claim Processed' : 'Policy Violation Blocked',
                 description: `Unit ${log.id} (SN: ${log.serialNumber || 'N/A'}) from ${partnerName} (${companyName}) is marked as ${log.status}.`,
                 type: log.status.includes('Rejected') ? 'REJECT' : 'CLAIM',
-                timestamp: log.timestamp
+                timestamp: getRelativeTime(log.date)
             };
         })
     ].slice(0, 10); // Limit to latest 10
