@@ -6,7 +6,7 @@ import { useData } from '../context/DataContext';
 const Layout = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { currentUser, companies, activityLogs, logout } = useData();
+    const { currentUser, companies, activityLogs, logout, isBackendAvailable } = useData();
 
     if (!currentUser) return null;
 
@@ -218,6 +218,16 @@ const Layout = () => {
                         <span className="font-bold text-sm tracking-wide text-slate-500 uppercase">{getBreadcrumbs()}</span>
                     </div>
                     <div className="flex items-center gap-6">
+                        {/* Connection Status Badge */}
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-black shadow-sm ${
+                            isBackendAvailable 
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
+                                : 'bg-amber-50 text-amber-600 border border-amber-200 animate-pulse'
+                        }`} title={isBackendAvailable ? "Connected to live PostgreSQL Central Database" : "Backend connection failed. Sandbox fallback enabled."}>
+                            <span className={`w-2 h-2 rounded-full ${isBackendAvailable ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                            {isBackendAvailable ? 'Live DB' : 'Sandbox Mode'}
+                        </div>
+
                         <div className="relative">
                             <button 
                                 onClick={() => setShowNotifications(!showNotifications)}
