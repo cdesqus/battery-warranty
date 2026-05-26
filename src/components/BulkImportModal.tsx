@@ -12,6 +12,9 @@ interface BulkImportModalProps {
 
 const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) => {
     const { sourceChannels, setCompanies, companies, currentUser, addActivityLog } = useData();
+    
+    if (!currentUser) return null;
+
     const [selectedChannel, setSelectedChannel] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -79,7 +82,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !selectedChannel) {
-            setError('Please select a Source Channel before uploading.');
+            setError('Please select a Partner before uploading.');
             return;
         }
 
@@ -211,11 +214,11 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
                 </div>
 
                 <div className="p-8 space-y-6">
-                    {/* Step 1: Select Channel */}
+                    {/* Step 1: Select Partner */}
                     <div className="space-y-3">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                            1. Select Source Channel
+                            1. Select Partner
                         </label>
                         <select
                             value={selectedChannel}
@@ -225,7 +228,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
                             }}
                             className={`w-full border-2 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none transition-all ${!selectedChannel ? 'border-rose-100 bg-rose-50/30' : 'border-slate-100 bg-slate-50/50 focus:border-indigo-600'}`}
                         >
-                            <option value="">-- Choose Channel --</option>
+                            <option value="">-- Choose Partner --</option>
                             {sourceChannels.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>

@@ -4,6 +4,9 @@ import { useData } from '../context/DataContext';
 
 const WarrantyCenter = () => {
     const { companies, setCompanies, addActivityLog, activityLogs, currentUser } = useData();
+    
+    if (!currentUser) return null;
+
     const [searchInput, setSearchInput] = useState('');
     const [validationResult, setValidationResult] = useState<any>(null);
     const [manualReason, setManualReason] = useState('Physical Damage');

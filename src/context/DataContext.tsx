@@ -51,20 +51,23 @@ export interface ActivityLog {
 export interface DataContextType {
     companies: CompanyAsset[];
     systemUsers: SystemUser[];
-    currentUser: SystemUser;
+    currentUser: SystemUser | null;
     activityLogs: ActivityLog[];
     setCompanies: React.Dispatch<React.SetStateAction<CompanyAsset[]>>;
     setSystemUsers: React.Dispatch<React.SetStateAction<SystemUser[]>>;
-    setCurrentUser: React.Dispatch<React.SetStateAction<SystemUser>>;
+    setCurrentUser: React.Dispatch<React.SetStateAction<SystemUser | null>>;
     addActivityLog: (log: Omit<ActivityLog, 'timestamp' | 'date'>) => void;
     getTotalUnits: () => number;
     models: string[];
     setModels: React.Dispatch<React.SetStateAction<string[]>>;
     sourceChannels: string[];
+    setSourceChannels: React.Dispatch<React.SetStateAction<string[]>>;
     selectedSource: string;
     setSelectedSource: (source: string) => void;
     isBackendAvailable: boolean;
     isLoading: boolean;
+    login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+    logout: () => void;
 }
 
 // --- Utilities ---
@@ -142,7 +145,7 @@ const initialCompanies: CompanyAsset[] = [
     ]}
 ];
 
-const SOURCE_CHANNELS = ["Source 1", "Source 2", "Source 3", "Source 4"];
+
 
 const initialLogs: ActivityLog[] = [
     { id: 'NGY-26-001', serialNumber: 'SN-100200', company: 'COMP-01', processedBy: 'Nur Rahma Atika', action: 'Validation Check', status: 'Approved', timestamp: 'Today', date: new Date().toISOString(), isBot: false },
@@ -169,10 +172,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         { id: 'USR-004', name: 'Rudi Hartono', email: 'rudi.h@admin.com', role: 'Admin', status: 'Inactive', lastLogin: '3 days ago', department: 'Admin' },
     ]);
 
-    const [currentUser, setCurrentUser] = useState<SystemUser>(systemUsers[0]);
+    const [currentUser, setCurrentUser] = useState<SystemUser | null>(() => {
+        const stored = localStorage.getItem('presales_user');
+        if (stored) {
+            try {
+                return JSON.parse(stored);
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    });
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(initialLogs);
     const [models, setModelsState] = useState<string[]>(['BAT-Z500 (Enterprise)', 'BAT-X100 (Commercial)', 'BAT-V200 (Industrial)']);
-    const [selectedSource, setSelectedSource] = useState<string>('All Sources');
+    const [sourceChannels, setSourceChannelsState] = useState<string[]>(['Source 1', 'Source 2', 'Source 3', 'Source 4']);
+    const [selectedSource, setSelectedSource] = useState<string>('All Partners');
     const [isBackendAvailable, setIsBackendAvailable] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -185,11 +199,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     console.log('Backend Express API discovered! Loading live corporate states from PostgreSQL DB...');
                     setIsBackendAvailable(true);
 
-                    const [companiesRes, usersRes, logsRes, modelsRes] = await Promise.all([
+                    const [companiesRes, usersRes, logsRes, modelsRes, partnersRes] = await Promise.all([
                         fetch(`${API_BASE}/companies`),
                         fetch(`${API_BASE}/system-users`),
                         fetch(`${API_BASE}/activity-logs`),
-                        fetch(`${API_BASE}/settings/models`)
+                        fetch(`${API_BASE}/settings/models`),
+                        fetch(`${API_BASE}/settings/partners`)
                     ]);
 
                     if (companiesRes.ok) {
@@ -200,8 +215,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         const usersData = await usersRes.json();
                         setSystemUsersState(usersData);
                         // Make sure current user references database profile
-                        const currentInDb = usersData.find((u: SystemUser) => u.id === 'USR-001') || usersData[0];
-                        if (currentInDb) setCurrentUser(currentInDb);
+                        const stored = localStorage.getItem('presales_user');
+                        if (stored) {
+                            try {
+                                const storedUser = JSON.parse(stored);
+                                const currentInDb = usersData.find((u: SystemUser) => u.id === storedUser.id);
+                                if (currentInDb) {
+                                    setCurrentUser(currentInDb);
+                                    localStorage.setItem('presales_user', JSON.stringify(currentInDb));
+                                }
+                            } catch (e) {
+                                // Ignore
+                            }
+                        }
                     }
                     if (logsRes.ok) {
                         const logsData = await logsRes.json();
@@ -210,6 +236,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     if (modelsRes.ok) {
                         const modelsData = await modelsRes.json();
                         setModelsState(modelsData);
+                    }
+                    if (partnersRes && partnersRes.ok) {
+                        const partnersData = await partnersRes.json();
+                        setSourceChannelsState(partnersData);
                     }
                 } else {
                     console.log('Backend API failed status check. Operating in sandboxed client mock state.');
@@ -427,8 +457,84 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
     };
 
+    const setSourceChannels = (value: React.SetStateAction<string[]>) => {
+        setSourceChannelsState(prev => {
+            const resolved = typeof value === 'function' ? (value as Function)(prev) : value;
+            
+            // Push settings update to DB
+            if (isBackendAvailable) {
+                fetch(`${API_BASE}/settings/partners`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ partners: resolved })
+                }).catch(err => console.error('State Synchronization Failure (Partners):', err));
+            }
+            
+            return resolved;
+        });
+    };
+
     const getTotalUnits = () => {
         return companies.reduce((total, company) => total + company.units.length, 0);
+    };
+
+    const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+        if (isBackendAvailable) {
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    return { success: false, error: data.error || 'Authentication failed' };
+                }
+                setCurrentUser(data.user);
+                localStorage.setItem('presales_user', JSON.stringify(data.user));
+                // Update systemUsers last login if matches in UI list
+                setSystemUsersState(prev => prev.map(u => u.id === data.user.id ? { ...u, lastLogin: data.user.lastLogin } : u));
+                return { success: true };
+            } catch (err) {
+                console.error('Backend auth failed, attempting sandbox fallback:', err);
+            }
+        }
+
+        // Sandbox/offline fallback
+        const mockPasswords: Record<string, string> = {
+            'rahma@presales.com': 'rahma123',
+            'alex@admin.com': 'alex123',
+            'sarah@viewer.com': 'sarah123',
+            'rudi.h@admin.com': 'rudi123'
+        };
+
+        const user = systemUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+        if (!user) {
+            return { success: false, error: 'Invalid email or password' };
+        }
+
+        if (user.status !== 'Active') {
+            return { success: false, error: 'Your account is inactive. Please contact your Super Admin.' };
+        }
+
+        const expectedPass = mockPasswords[user.email.toLowerCase()] || 'password123';
+        if (password !== expectedPass) {
+            return { success: false, error: 'Invalid email or password' };
+        }
+
+        const nowStr = 'Just now';
+        const updatedUser = { ...user, lastLogin: nowStr };
+        
+        setCurrentUser(updatedUser);
+        localStorage.setItem('presales_user', JSON.stringify(updatedUser));
+        setSystemUsersState(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+
+        return { success: true };
+    };
+
+    const logout = () => {
+        setCurrentUser(null);
+        localStorage.removeItem('presales_user');
     };
 
     return (
@@ -444,11 +550,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             getTotalUnits,
             models,
             setModels,
-            sourceChannels: SOURCE_CHANNELS,
+            sourceChannels,
+            setSourceChannels,
             selectedSource,
             setSelectedSource,
             isBackendAvailable,
-            isLoading
+            isLoading,
+            login,
+            logout
         }}>
             {isLoading ? (
                 <div className="fixed inset-0 bg-[#0F172A] flex flex-col items-center justify-center text-white z-[9999] gap-4">

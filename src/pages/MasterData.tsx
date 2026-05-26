@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Search, Plus, Edit2, X, CheckCircle2, FileSpreadsheet, Trash2, Database } from 'lucide-react';
+import { Search, Plus, Edit2, X, CheckCircle2, FileSpreadsheet, Trash2, Database, Settings } from 'lucide-react';
 import { useData, getBatteryStatus } from '../context/DataContext';
 import ExportModal from '../components/ExportModal';
 import BulkImportModal from '../components/BulkImportModal';
 
 const MasterData = () => {
-    const { companies, setCompanies, models, setModels, addActivityLog, currentUser, sourceChannels, selectedSource, setSelectedSource } = useData();
+    const { companies, setCompanies, models, setModels, addActivityLog, currentUser, sourceChannels, setSourceChannels, selectedSource, setSelectedSource } = useData();
+    
+    if (!currentUser) return null;
+
     const [searchTerm, setSearchTerm] = useState('');
     const [showImportModal, setShowImportModal] = useState(false);
 
@@ -18,6 +21,54 @@ const MasterData = () => {
 
     // Export Modal
     const [showExportModal, setShowExportModal] = useState(false);
+
+    // Partners CRUD States
+    const [showPartnersModal, setShowPartnersModal] = useState(false);
+    const [newPartnerName, setNewPartnerName] = useState('');
+    const [editingPartner, setEditingPartner] = useState<{ oldName: string, currentVal: string } | null>(null);
+
+    const handleAddPartner = () => {
+        if (!newPartnerName.trim()) return;
+        if (sourceChannels.includes(newPartnerName.trim())) {
+            showToast('Partner name already exists!');
+            return;
+        }
+        setSourceChannels([...sourceChannels, newPartnerName.trim()]);
+        setNewPartnerName('');
+        showToast('Partner registered successfully!');
+    };
+
+    const handleRenamePartner = (oldName: string, newName: string) => {
+        if (!newName || newName.trim() === '') return;
+        const trimmed = newName.trim();
+        if (sourceChannels.includes(trimmed) && trimmed !== oldName) {
+            showToast('Partner name already exists!');
+            return;
+        }
+        
+        // Update in sourceChannels
+        setSourceChannels(prev => prev.map(p => p === oldName ? trimmed : p));
+        
+        // Also cascade update any units matching oldName
+        setCompanies(prev => prev.map(c => ({
+            ...c,
+            units: c.units.map(u => u.sourceChannel === oldName ? { ...u, sourceChannel: trimmed } : u)
+        })));
+        
+        showToast('Partner renamed successfully!');
+    };
+
+    const handleDeletePartner = (partnerName: string) => {
+        setSourceChannels(prev => prev.filter(p => p !== partnerName));
+        
+        // Also clean up matching units
+        setCompanies(prev => prev.map(c => ({
+            ...c,
+            units: c.units.map(u => u.sourceChannel === partnerName ? { ...u, sourceChannel: undefined } : u)
+        })));
+        
+        showToast('Partner deleted successfully!');
+    };
 
     // Form States
     interface PresalesFormData {
@@ -194,7 +245,7 @@ const MasterData = () => {
             const matchesSearch = u.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                  u.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                  u.batteryModel.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesSource = selectedSource === 'All Sources' || u.sourceChannel === selectedSource;
+            const matchesSource = selectedSource === 'All Partners' || u.sourceChannel === selectedSource;
             return matchesSearch && matchesSource;
         }).sort((a, b) => new Date(b.applicationDate || b.contractStartDate).getTime() - new Date(a.applicationDate || a.contractStartDate).getTime());
     }, [companies, searchTerm, selectedSource]);
@@ -223,15 +274,25 @@ const MasterData = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="relative flex-1 max-w-[200px]">
+                    <div className="flex items-center gap-1.5 shrink-0">
                         <select
                             value={selectedSource}
                             onChange={(e) => setSelectedSource(e.target.value)}
-                            className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/20"
+                            className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/20 w-44"
                         >
-                            <option>All Sources</option>
+                            <option value="All Partners">All Partners</option>
                             {sourceChannels.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
+                        {currentUser.role !== 'Viewer' && (
+                            <button
+                                type="button"
+                                onClick={() => setShowPartnersModal(true)}
+                                className="p-2 border border-slate-300 rounded-lg bg-white text-slate-500 hover:text-[#1A2B4C] hover:bg-slate-50 transition-all shadow-sm"
+                                title="Manage Partners"
+                            >
+                                <Settings size={15} />
+                            </button>
+                        )}
                     </div>
                     <button
                         onClick={() => setShowExportModal(true)}
@@ -473,6 +534,107 @@ const MasterData = () => {
                 onClose={() => setShowImportModal(false)} 
             />
 
+            {/* Partners CRUD Modal */}
+            {showPartnersModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+                        <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h3 className="font-black text-slate-800 text-xl">Manage Partners</h3>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Register & maintain corporate partners</p>
+                            </div>
+                            <button onClick={() => { setShowPartnersModal(false); setEditingPartner(null); }} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-200 rounded-full transition-all">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            {/* Add New Partner Form */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Register New Partner</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        value={newPartnerName}
+                                        onChange={e => setNewPartnerName(e.target.value)}
+                                        placeholder="Partner Name (e.g. Partner A)"
+                                        className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/20 focus:border-[#1A2B4C]"
+                                    />
+                                    <button 
+                                        onClick={handleAddPartner}
+                                        className="bg-[#1A2B4C] text-white px-4 py-2.5 rounded-xl font-bold hover:bg-[#253e6b] transition-all text-sm"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Partners List */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Registered Partners</label>
+                                <div className="border border-slate-100 rounded-2xl max-h-[220px] overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
+                                    {sourceChannels.length === 0 ? (
+                                        <div className="p-6 text-center text-xs text-slate-400 italic">No partners registered yet.</div>
+                                    ) : (
+                                        sourceChannels.map(partner => (
+                                            <div key={partner} className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                                {editingPartner?.oldName === partner ? (
+                                                    <div className="flex gap-2 w-full">
+                                                        <input 
+                                                            type="text"
+                                                            value={editingPartner.currentVal}
+                                                            onChange={e => setEditingPartner({ ...editingPartner, currentVal: e.target.value })}
+                                                            className="flex-1 border border-slate-200 rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none"
+                                                        />
+                                                        <button 
+                                                            onClick={() => {
+                                                                handleRenamePartner(partner, editingPartner.currentVal);
+                                                                setEditingPartner(null);
+                                                            }}
+                                                            className="text-xs bg-emerald-600 text-white px-2 py-1 rounded font-bold"
+                                                        >
+                                                            Save
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setEditingPartner(null)}
+                                                            className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded font-bold"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-xs font-bold text-slate-700">{partner}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <button 
+                                                                onClick={() => setEditingPartner({ oldName: partner, currentVal: partner })}
+                                                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded transition-all"
+                                                                title="Rename Partner"
+                                                            >
+                                                                <Edit2 size={13} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    if (confirm(`Are you sure you want to delete partner "${partner}"? Any units assigned to this partner will be set to unassigned.`)) {
+                                                                        handleDeletePartner(partner);
+                                                                    }
+                                                                }}
+                                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded transition-all"
+                                                                title="Delete Partner"
+                                                            >
+                                                                <Trash2 size={13} />
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

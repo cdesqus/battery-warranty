@@ -145,7 +145,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                     let include = true;
                     if (startDate && unitDate < new Date(startDate)) include = false;
                     if (endDate && unitDate > new Date(endDate)) include = false;
-                    if (selectedSource !== 'All Sources' && unit.sourceChannel !== selectedSource) include = false;
+                    if (selectedSource !== 'All Partners' && unit.sourceChannel !== selectedSource) include = false;
 
                     if (include) {
                         const sDate = new Date(unit.contractStartDate);

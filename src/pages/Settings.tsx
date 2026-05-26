@@ -10,26 +10,29 @@ const Settings = () => {
 
     // Profile Form State
     const [profileForm, setProfileForm] = useState({
-        name: currentUser.name,
-        email: currentUser.email || '',
-        department: currentUser.department,
+        name: currentUser?.name || '',
+        email: currentUser?.email || '',
+        department: currentUser?.department || '',
         password: '',
         confirmPassword: ''
     });
 
     // User Management Modal State
     const [showUserModal, setShowUserModal] = useState<SystemUser | 'NEW' | null>(null);
-    const [userForm, setUserForm] = useState<Partial<SystemUser>>({
+    const [userForm, setUserForm] = useState<Partial<SystemUser> & { password?: string }>({
         name: '',
         email: '',
         role: 'Viewer',
-        status: 'Active'
+        status: 'Active',
+        password: ''
     });
 
     const showToast = (msg: string) => {
         setToast(msg);
         setTimeout(() => setToast(null), 3000);
     };
+
+    if (!currentUser) return null;
 
     const handleUpdateProfile = (e: React.FormEvent) => {
         e.preventDefault();
@@ -43,7 +46,7 @@ const Settings = () => {
             name: profileForm.name,
             email: profileForm.email,
             department: profileForm.department
-        });
+        } as SystemUser);
         showToast('Profile updated successfully!');
     };
 
@@ -68,19 +71,21 @@ const Settings = () => {
         if (!userForm.name || !userForm.email) return;
 
         if (showUserModal === 'NEW') {
-            const newUser: SystemUser = {
+            const newUser: SystemUser & { password?: string } = {
                 id: `USR-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
                 name: userForm.name!,
                 email: userForm.email!,
                 role: userForm.role as UserRole,
                 status: userForm.status as 'Active' | 'Inactive',
-                lastLogin: 'Never'
+                lastLogin: 'Never',
+                password: userForm.password || 'password123'
             };
             setSystemUsers([...systemUsers, newUser]);
             showToast('User created successfully!');
         } else if (showUserModal) {
+            const { password, ...updateData } = userForm;
             setSystemUsers(prev => prev.map(u => 
-                u.id === showUserModal.id ? { ...u, ...userForm } : u
+                u.id === (showUserModal as SystemUser).id ? { ...u, ...updateData } : u
             ));
             showToast('User updated successfully!');
         }
@@ -348,6 +353,19 @@ const Settings = () => {
                                     className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/20 focus:border-[#1A2B4C]"
                                 />
                             </div>
+                            {showUserModal === 'NEW' && (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password Credentials</label>
+                                    <input 
+                                        type="password" 
+                                        value={userForm.password || ''}
+                                        onChange={e => setUserForm({...userForm, password: e.target.value})}
+                                        placeholder="Enter password (default: password123)"
+                                        className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/20 focus:border-[#1A2B4C]"
+                                    />
+                                    <p className="text-[9px] text-slate-400 mt-1 font-semibold italic">ℹ️ If left blank, password defaults to password123</p>
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Authorization Role</label>
                                 <select 

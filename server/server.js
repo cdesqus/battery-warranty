@@ -190,13 +190,13 @@ app.get('/api/system-users', async (req, res) => {
 
 // 7. CREATE SYSTEM USER
 app.post('/api/system-users', async (req, res) => {
-  const { id, name, email, role, status, lastLogin } = req.body;
+  const { id, name, email, role, status, lastLogin, password } = req.body;
   try {
     const result = await query(
-      `INSERT INTO system_users (id, name, email, role, status, last_login)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO system_users (id, name, email, role, status, last_login, password)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, name, email, role, status, last_login as "lastLogin"`,
-      [id, name, email, role, status, lastLogin || 'Never']
+      [id, name, email, role, status, lastLogin || 'Never', password || 'password123']
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -321,7 +321,123 @@ app.post('/api/settings/models', async (req, res) => {
   }
 });
 
-// Start listening
-app.listen(PORT, () => {
-  console.log(`Backend API server running in production mode on port ${PORT}`);
+// 13b. GET APP SETTINGS (Partners list)
+app.get('/api/settings/partners', async (req, res) => {
+  try {
+    const result = await query("SELECT value FROM settings WHERE key = 'partners'");
+    if (result.rowCount === 0) {
+      const defaultPartners = ["Source 1", "Source 2", "Source 3", "Source 4"];
+      return res.json(defaultPartners);
+    }
+    res.json(result.rows[0].value);
+  } catch (error) {
+    console.error('Error fetching partners:', error);
+    res.status(500).json({ error: 'Failed to fetch partners' });
+  }
+});
+
+// 13c. UPDATE/ADD PARTNERS
+app.post('/api/settings/partners', async (req, res) => {
+  const { partners } = req.body; // Expects full array of partners
+  if (!Array.isArray(partners)) {
+    return res.status(400).json({ error: 'Invalid partners array format' });
+  }
+  try {
+    await query(
+      `INSERT INTO settings (key, value)
+       VALUES ('partners', $1)
+       ON CONFLICT (key)
+       DO UPDATE SET value = EXCLUDED.value
+       RETURNING value`,
+      [JSON.stringify(partners)]
+    );
+    res.json({ message: 'Partners updated successfully', partners });
+  } catch (error) {
+    console.error('Error saving partners settings:', error);
+    res.status(500).json({ error: 'Failed to save partners settings' });
+  }
+});
+
+// 14. AUTH LOGIN
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  try {
+    const result = await query(
+      `SELECT id, name, email, role, status, last_login as "lastLogin", password
+       FROM system_users
+       WHERE email = $1`,
+      [email]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const user = result.rows[0];
+
+    if (user.status !== 'Active') {
+      return res.status(403).json({ error: 'Your account is inactive. Please contact your Super Admin.' });
+    }
+
+    if (user.password !== password) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Update last login
+    const nowStr = new Date().toLocaleString();
+    await query(
+      `UPDATE system_users
+       SET last_login = $1
+       WHERE id = $2`,
+      [nowStr, user.id]
+    );
+
+    // Remove password from response
+    delete user.password;
+    user.lastLogin = nowStr;
+
+    res.json({ message: 'Login successful', user });
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ error: 'An error occurred during login' });
+  }
+});
+
+// Self-migration check before starting
+const runMigrations = async () => {
+  try {
+    console.log('Running backend database self-migrations...');
+    await query(`
+      ALTER TABLE system_users ADD COLUMN IF NOT EXISTS password VARCHAR(255) NOT NULL DEFAULT 'password123';
+    `);
+    
+    // Sync default passwords for the seeded users
+    await query(`
+      UPDATE system_users SET password = 'rahma123' WHERE email = 'rahma@presales.com';
+      UPDATE system_users SET password = 'alex123' WHERE email = 'alex@admin.com';
+      UPDATE system_users SET password = 'sarah123' WHERE email = 'sarah@viewer.com';
+      UPDATE system_users SET password = 'rudi123' WHERE email = 'rudi.h@admin.com';
+    `);
+
+    // Seed default partners in settings
+    await query(`
+      INSERT INTO settings (key, value)
+      VALUES ('partners', '["Source 1", "Source 2", "Source 3", "Source 4"]')
+      ON CONFLICT (key) DO NOTHING;
+    `);
+    console.log('Database self-migrations completed successfully.');
+  } catch (err) {
+    console.error('Database self-migration failed/skipped:', err.message);
+  }
+};
+
+// Run migrations and then start listening
+runMigrations().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Backend API server running in production mode on port ${PORT}`);
+  });
 });

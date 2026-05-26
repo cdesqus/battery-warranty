@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, ShieldCheck, BarChart3, Settings, Bell, CircleUser, X, AlertTriangle, ShieldAlert, History } from 'lucide-react';
+import { LayoutDashboard, Database, ShieldCheck, BarChart3, Settings, Bell, CircleUser, X, AlertTriangle, ShieldAlert, History, LogOut } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 const Layout = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { currentUser, companies, activityLogs } = useData();
+    const { currentUser, companies, activityLogs, logout } = useData();
+
+    if (!currentUser) return null;
 
     const getInitials = (name: string) => {
         if (!name) return '??';
@@ -181,14 +183,26 @@ const Layout = () => {
                 </nav>
 
                 <div className="p-4 border-t border-slate-700 bg-[#14223d]">
-                    <div className="flex items-center gap-3 px-2 py-2">
-                        <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center overflow-hidden">
-                            <CircleUser size={24} className="text-slate-300" />
+                    <div className="flex items-center justify-between px-2 py-2">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center overflow-hidden">
+                                <CircleUser size={24} className="text-slate-300" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold">{currentUser.name}</p>
+                                <p className="text-xs text-slate-400">{currentUser.role}</p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-sm font-semibold">{currentUser.name}</p>
-                            <p className="text-xs text-slate-400">{currentUser.role}</p>
-                        </div>
+                        <button 
+                            onClick={() => {
+                                logout();
+                                navigate('/login');
+                            }}
+                            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                            title="Log Out"
+                        >
+                            <LogOut size={18} />
+                        </button>
                     </div>
                 </div>
             </aside>

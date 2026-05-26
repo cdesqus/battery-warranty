@@ -14,7 +14,7 @@ const Reporting = () => {
         
         companies.forEach(c => {
             c.units.forEach(u => {
-                if (selectedSource !== 'All Sources' && u.sourceChannel !== selectedSource) return;
+                if (selectedSource !== 'All Partners' && u.sourceChannel !== selectedSource) return;
                 const date = new Date(u.applicationDate || u.contractStartDate);
                 const monthKey = date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
                 monthsMap[monthKey] = (monthsMap[monthKey] || 0) + 1;
@@ -39,7 +39,7 @@ const Reporting = () => {
     const rejectionData = useMemo(() => {
         const rejectedLogs = activityLogs.filter(log => {
             const matchesStatus = log.status.toLowerCase().includes('reject');
-            if (selectedSource === 'All Sources') return matchesStatus;
+            if (selectedSource === 'All Partners') return matchesStatus;
             
             // Link log to unit to check source
             const unit = companies.flatMap(c => c.units).find(u => u.id === log.id);
@@ -75,7 +75,7 @@ const Reporting = () => {
 
     let expiringSoon = 0;
     companies.forEach(c => c.units.forEach(u => {
-        if (selectedSource !== 'All Sources' && u.sourceChannel !== selectedSource) return;
+        if (selectedSource !== 'All Partners' && u.sourceChannel !== selectedSource) return;
         const installDate = new Date(u.contractStartDate);
         const expiryDate = new Date(installDate);
         expiryDate.setMonth(expiryDate.getMonth() + 24);
@@ -87,7 +87,7 @@ const Reporting = () => {
 
     const totalRejected = rejectionData.reduce((acc, curr) => acc + curr.value, 0);
     const totalUnitsFiltered = useMemo(() => {
-        if (selectedSource === 'All Sources') return getTotalUnits();
+        if (selectedSource === 'All Partners') return getTotalUnits();
         return companies.reduce((acc, c) => acc + c.units.filter(u => u.sourceChannel === selectedSource).length, 0);
     }, [companies, selectedSource, getTotalUnits]);
     const totalUnits = totalUnitsFiltered || 0;
@@ -107,7 +107,7 @@ const Reporting = () => {
                             onChange={(e) => setSelectedSource(e.target.value)}
                             className="bg-white border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/20 shadow-sm"
                         >
-                            <option>All Sources</option>
+                            <option value="All Partners">All Partners</option>
                             {sourceChannels.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>

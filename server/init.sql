@@ -36,6 +36,7 @@ CREATE TABLE system_users (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL DEFAULT 'password123',
     role VARCHAR(50) NOT NULL CHECK (role IN ('Super Admin', 'Admin', 'Viewer')),
     status VARCHAR(50) NOT NULL CHECK (status IN ('Active', 'Inactive')),
     last_login VARCHAR(100) NOT NULL DEFAULT 'Never'
@@ -141,11 +142,11 @@ INSERT INTO units (id, serial_number, battery_model, contract_start_date, claim_
 ('NGY-26-072', 'SN-982113', 'BAT-Z500 (Enterprise)', '2026-04-15', 0, '2026-04-15', 200000, 0.10, NULL, 'Source 1', 'COMP-31');
 
 -- Seed System Users
-INSERT INTO system_users (id, name, email, role, status, last_login) VALUES
-('USR-001', 'Nur Rahma Atika', 'rahma@presales.com', 'Super Admin', 'Active', 'Just now'),
-('USR-002', 'Alex Rivera', 'alex@admin.com', 'Admin', 'Active', '2 hours ago'),
-('USR-003', 'Siti Sarah', 'sarah@viewer.com', 'Viewer', 'Active', '1 day ago'),
-('USR-004', 'Rudi Hartono', 'rudi.h@admin.com', 'Admin', 'Inactive', '3 days ago');
+INSERT INTO system_users (id, name, email, password, role, status, last_login) VALUES
+('USR-001', 'Nur Rahma Atika', 'rahma@presales.com', 'rahma123', 'Super Admin', 'Active', 'Just now'),
+('USR-002', 'Alex Rivera', 'alex@admin.com', 'alex123', 'Admin', 'Active', '2 hours ago'),
+('USR-003', 'Siti Sarah', 'sarah@viewer.com', 'sarah123', 'Viewer', 'Active', '1 day ago'),
+('USR-004', 'Rudi Hartono', 'rudi.h@admin.com', 'rudi123', 'Admin', 'Inactive', '3 days ago');
 
 -- Seed Activity Logs (mapped from mock data)
 INSERT INTO activity_logs (unit_id, serial_number, company_id, processed_by, action, status, timestamp, date, is_bot) VALUES
