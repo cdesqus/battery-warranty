@@ -135,6 +135,16 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
             const appId = (row['Application ID'] || row['id'] || '').toString().trim();
             const sn = (row['Serial Number'] || row['sn'] || '').toString().trim().toUpperCase();
             
+            // SKIP EMPTY OR BLANK ROWS
+            if (!sn && !appId) {
+                return;
+            }
+
+            // SKIP RECORD IF SERIAL NUMBER IS COMPLETELY MISSING
+            if (!sn) {
+                return;
+            }
+            
             // SKIP EXAMPLE ROWS
             if (appId.includes('XXXX') || sn.includes('XXXX')) {
                 return;
