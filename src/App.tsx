@@ -6,6 +6,7 @@ import WarrantyCenter from './pages/WarrantyCenter';
 import Reporting from './pages/Reporting';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import Logistics from './pages/Logistics';
 import { DataProvider, useData } from './context/DataContext';
 
 function AppRoutes() {
@@ -31,6 +32,7 @@ function AppRoutes() {
                 <Route path="settings" element={<Settings />} />
               )}
               <Route path="reporting" element={<Reporting />} />
+              <Route path="logistics" element={<Logistics />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </>

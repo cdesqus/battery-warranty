@@ -48,6 +48,18 @@ export interface ActivityLog {
     isBot: boolean;
 }
 
+export interface LogisticsRecord {
+    applicationId: string;
+    trackingNumber: string;
+    courierName: string;
+    currentLocation: string;
+    shippingStatus: string;
+    stage: number;
+    lastUpdated: string;
+    serialNumber?: string;
+    batteryModel?: string;
+}
+
 export interface DataContextType {
     companies: CompanyAsset[];
     systemUsers: SystemUser[];
@@ -68,6 +80,10 @@ export interface DataContextType {
     isLoading: boolean;
     login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
+    logistics: LogisticsRecord[];
+    setLogistics: React.Dispatch<React.SetStateAction<LogisticsRecord[]>>;
+    addLogistics: (applicationId: string, trackingNumber: string, courierName: string) => Promise<LogisticsRecord>;
+    simulateLogisticsUpdate: (trackingNumber: string) => Promise<LogisticsRecord>;
 }
 
 // --- Utilities ---
@@ -159,6 +175,11 @@ const initialLogs: ActivityLog[] = [
     { id: 'NGY-26-032', serialNumber: 'SN-455566', company: 'COMP-24', processedBy: 'System Bot', action: 'Validation Check', status: 'Approved', timestamp: '3 days ago', date: new Date(Date.now() - 259200000).toISOString(), isBot: true },
 ];
 
+const initialLogistics: LogisticsRecord[] = [
+    { applicationId: 'NGY-26-071', trackingNumber: 'RESI-DUMMY-01', courierName: 'JNE Express', currentLocation: 'Package handed over to courier at Central Warehouse', shippingStatus: 'PREPARING', stage: 1, lastUpdated: new Date().toISOString(), serialNumber: 'SN-982112', batteryModel: 'BAT-Z500 (Enterprise)' },
+    { applicationId: 'NGY-26-072', trackingNumber: 'RESI-DUMMY-02', courierName: 'J&T Express', currentLocation: 'Package in transit to Sortation Center Jakarta', shippingStatus: 'IN TRANSIT', stage: 2, lastUpdated: new Date().toISOString(), serialNumber: 'SN-982113', batteryModel: 'BAT-Z500 (Enterprise)' }
+];
+
 export const DataContext = createContext<DataContextType | undefined>(undefined);
 
 const API_BASE = '/api';
@@ -189,6 +210,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [selectedSource, setSelectedSource] = useState<string>('All Partners');
     const [isBackendAvailable, setIsBackendAvailable] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [logistics, setLogisticsState] = useState<LogisticsRecord[]>(initialLogistics);
 
     // Initial mount hook: Try to connect to backend health check and establish background polling
     useEffect(() => {
@@ -200,12 +222,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (healthRes.ok) {
                     if (isMounted) setIsBackendAvailable(true);
 
-                    const [companiesRes, usersRes, logsRes, modelsRes, partnersRes] = await Promise.all([
+                    const [companiesRes, usersRes, logsRes, modelsRes, partnersRes, logisticsRes] = await Promise.all([
                         fetch(`${API_BASE}/companies`),
                         fetch(`${API_BASE}/system-users`),
                         fetch(`${API_BASE}/activity-logs`),
                         fetch(`${API_BASE}/settings/models`),
-                        fetch(`${API_BASE}/settings/partners`)
+                        fetch(`${API_BASE}/settings/partners`),
+                        fetch(`${API_BASE}/logistics`)
                     ]);
 
                     if (!isMounted) return;
@@ -243,6 +266,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     if (partnersRes && partnersRes.ok) {
                         const partnersData = await partnersRes.json();
                         setSourceChannelsState(partnersData);
+                    }
+                    if (logisticsRes && logisticsRes.ok) {
+                        const logisticsData = await logisticsRes.json();
+                        setLogisticsState(logisticsData);
                     }
                 } else {
                     console.log('Backend API failed status check. Operating in sandboxed client mock state.');
@@ -551,6 +578,153 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.removeItem('presales_user');
     };
 
+    const addLogistics = async (applicationId: string, trackingNumber: string, courierName: string): Promise<LogisticsRecord> => {
+        const defaultLocation = 'Package handed over to courier at Central Warehouse';
+        const defaultStatus = 'PREPARING';
+
+        // Find unit details locally to enrich the record
+        let foundSerial = '';
+        let foundModel = '';
+        companies.forEach(c => {
+            const u = c.units.find(un => un.id === applicationId);
+            if (u) {
+                foundSerial = u.serialNumber;
+                foundModel = u.batteryModel;
+            }
+        });
+
+        const newRecord: LogisticsRecord = {
+            applicationId,
+            trackingNumber,
+            courierName,
+            currentLocation: defaultLocation,
+            shippingStatus: defaultStatus,
+            stage: 1,
+            lastUpdated: new Date().toISOString(),
+            serialNumber: foundSerial,
+            batteryModel: foundModel
+        };
+
+        if (isBackendAvailable) {
+            try {
+                const res = await fetch(`${API_BASE}/logistics`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ applicationId, trackingNumber, courierName })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setLogisticsState(prev => {
+                        const filtered = prev.filter(r => r.applicationId !== applicationId);
+                        return [data, ...filtered];
+                    });
+                    return data;
+                }
+            } catch (err) {
+                console.error('Failed to save logistics to backend, falling back to local:', err);
+            }
+        }
+
+        // Offline Sandbox
+        setLogisticsState(prev => {
+            const filtered = prev.filter(r => r.applicationId !== applicationId);
+            return [newRecord, ...filtered];
+        });
+        return newRecord;
+    };
+
+    const simulateLogisticsUpdate = async (trackingNumber: string): Promise<LogisticsRecord> => {
+        if (isBackendAvailable) {
+            try {
+                const res = await fetch(`${API_BASE}/logistics/simulate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trackingNumber })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setLogisticsState(prev => prev.map(r => r.trackingNumber === trackingNumber ? data : r));
+                    
+                    // Trigger state update for units in frontend to sync immediately
+                    if (data.stage === 4) {
+                        setCompaniesState(prev => prev.map(c => ({
+                            ...c,
+                            units: c.units.map(u => u.id === data.applicationId ? { ...u, statusOverride: 'Active' } : u)
+                        })));
+                    }
+                    return data;
+                }
+            } catch (err) {
+                console.error('Failed to simulate backend logistics update, falling back to local:', err);
+            }
+        }
+
+        // Offline Sandbox Fallback
+        let updatedRecord: LogisticsRecord | null = null;
+        setLogisticsState(prev => prev.map(r => {
+            if (r.trackingNumber === trackingNumber) {
+                let nextStage = (r.stage % 4) + 1;
+                let nextLocation = '';
+                let nextStatus = '';
+
+                switch (nextStage) {
+                    case 1:
+                        nextLocation = 'Package handed over to courier at Central Warehouse';
+                        nextStatus = 'PREPARING';
+                        break;
+                    case 2:
+                        nextLocation = 'Package in transit to Sortation Center Jakarta';
+                        nextStatus = 'IN TRANSIT';
+                        break;
+                    case 3:
+                        nextLocation = 'Package is out for delivery by courier to partner site';
+                        nextStatus = 'IN TRANSIT';
+                        break;
+                    case 4:
+                        nextLocation = 'Package successfully received by Partner representative';
+                        nextStatus = 'DELIVERED';
+                        break;
+                }
+
+                updatedRecord = {
+                    ...r,
+                    stage: nextStage,
+                    currentLocation: nextLocation,
+                    shippingStatus: nextStatus,
+                    lastUpdated: new Date().toISOString()
+                };
+
+                // If Stage 4, activate unit locally
+                if (nextStage === 4) {
+                    setTimeout(() => {
+                        setCompaniesState(cPrev => cPrev.map(c => ({
+                            ...c,
+                            units: c.units.map(u => u.id === r.applicationId ? { ...u, statusOverride: 'Active' } : u)
+                        })));
+                        
+                        addActivityLog({
+                            id: r.applicationId,
+                            serialNumber: r.serialNumber || 'UNKNOWN',
+                            company: 'COMP-01',
+                            processedBy: 'System Bot',
+                            action: 'Delivery Active Sync',
+                            status: 'Approved',
+                            isBot: true
+                        });
+                    }, 0);
+                }
+
+                return updatedRecord;
+            }
+            return r;
+        }));
+
+        if (!updatedRecord) {
+            throw new Error('Tracking number not found');
+        }
+        return updatedRecord;
+    };
+
     return (
         <DataContext.Provider value={{
             companies,
@@ -571,7 +745,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             isBackendAvailable,
             isLoading,
             login,
-            logout
+            logout,
+            logistics,
+            setLogistics: setLogisticsState as React.Dispatch<React.SetStateAction<LogisticsRecord[]>>,
+            addLogistics,
+            simulateLogisticsUpdate
         }}>
             {isLoading ? (
                 <div className="fixed inset-0 bg-[#0F172A] flex flex-col items-center justify-center text-white z-[9999] gap-4">

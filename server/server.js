@@ -369,6 +369,162 @@ app.post('/api/settings/reset', async (req, res) => {
   }
 });
 
+// --- 13e. LOGISTICS TRACKING MODULE ---
+
+// Fetch all logistics records
+app.get('/api/logistics', async (req, res) => {
+  try {
+    const result = await query(`
+      SELECT lt.application_id as "applicationId", lt.tracking_number as "trackingNumber",
+             lt.courier_name as "courierName", lt.current_location as "currentLocation",
+             lt.shipping_status as "shippingStatus", lt.stage, 
+             lt.last_updated as "lastUpdated",
+             u.serial_number as "serialNumber", u.battery_model as "batteryModel"
+      FROM logistics_tracking lt
+      LEFT JOIN units u ON lt.application_id = u.id
+      ORDER BY lt.last_updated DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching logistics:', error);
+    res.status(500).json({ error: 'Failed to fetch logistics data' });
+  }
+});
+
+// Create a new tracking link for a unit
+app.post('/api/logistics', async (req, res) => {
+  const { applicationId, trackingNumber, courierName } = req.body;
+  if (!applicationId || !trackingNumber || !courierName) {
+    return res.status(400).json({ error: 'Missing required tracking details' });
+  }
+  
+  try {
+    const defaultLocation = 'Package handed over to courier at Central Warehouse';
+    const defaultStatus = 'PREPARING';
+    
+    await query(`
+      INSERT INTO logistics_tracking (application_id, tracking_number, courier_name, current_location, shipping_status, stage)
+      VALUES ($1, $2, $3, $4, $5, 1)
+      ON CONFLICT (application_id) 
+      DO UPDATE SET tracking_number = EXCLUDED.tracking_number, 
+                    courier_name = EXCLUDED.courier_name,
+                    current_location = EXCLUDED.current_location,
+                    shipping_status = EXCLUDED.shipping_status,
+                    stage = 1,
+                    last_updated = NOW()
+    `, [applicationId, trackingNumber, courierName, defaultLocation, defaultStatus]);
+    
+    const joinedResult = await query(`
+      SELECT lt.application_id as "applicationId", lt.tracking_number as "trackingNumber",
+             lt.courier_name as "courierName", lt.current_location as "currentLocation",
+             lt.shipping_status as "shippingStatus", lt.stage, 
+             lt.last_updated as "lastUpdated",
+             u.serial_number as "serialNumber", u.battery_model as "batteryModel"
+      FROM logistics_tracking lt
+      LEFT JOIN units u ON lt.application_id = u.id
+      WHERE lt.application_id = $1
+    `, [applicationId]);
+    
+    res.status(201).json(joinedResult.rows[0]);
+  } catch (error) {
+    console.error('Error creating tracking:', error);
+    res.status(500).json({ error: 'Failed to create tracking record' });
+  }
+});
+
+// Simulate API update (advanced sandbox stages 1 -> 2 -> 3 -> 4)
+app.post('/api/logistics/simulate', async (req, res) => {
+  // Allow simulation in development environment
+  if (process.env.NODE_ENV !== 'development') {
+    return res.status(403).json({ error: 'Simulation mode is restricted to development environment' });
+  }
+
+  const { trackingNumber } = req.body;
+  if (!trackingNumber) {
+    return res.status(400).json({ error: 'Tracking number is required' });
+  }
+
+  try {
+    const recordResult = await query(
+      "SELECT * FROM logistics_tracking WHERE tracking_number = $1",
+      [trackingNumber]
+    );
+
+    if (recordResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Tracking record not found' });
+    }
+
+    const record = recordResult.rows[0];
+    let nextStage = (record.stage % 4) + 1; // Cycle 1 -> 2 -> 3 -> 4 -> 1
+
+    let nextLocation = '';
+    let nextStatus = '';
+
+    switch (nextStage) {
+      case 1:
+        nextLocation = 'Package handed over to courier at Central Warehouse';
+        nextStatus = 'PREPARING';
+        break;
+      case 2:
+        nextLocation = 'Package in transit to Sortation Center Jakarta';
+        nextStatus = 'IN TRANSIT';
+        break;
+      case 3:
+        nextLocation = 'Package is out for delivery by courier to partner site';
+        nextStatus = 'IN TRANSIT';
+        break;
+      case 4:
+        nextLocation = 'Package successfully received by Partner representative';
+        nextStatus = 'DELIVERED';
+        break;
+    }
+
+    await query('BEGIN');
+
+    await query(`
+      UPDATE logistics_tracking
+      SET stage = $1, current_location = $2, shipping_status = $3, last_updated = NOW()
+      WHERE tracking_number = $4
+    `, [nextStage, nextLocation, nextStatus, trackingNumber]);
+
+    // If hits DELIVERED (Stage 4), automatically activate the warranty
+    if (nextStage === 4) {
+      await query(
+        "UPDATE units SET status_override = 'Active' WHERE id = $1",
+        [record.application_id]
+      );
+      
+      const unitResult = await query("SELECT serial_number, company_id FROM units WHERE id = $1", [record.application_id]);
+      if (unitResult.rowCount > 0) {
+        const u = unitResult.rows[0];
+        await query(`
+          INSERT INTO activity_logs (unit_id, serial_number, company_id, processed_by, action, status, timestamp, date, is_bot)
+          VALUES ($1, $2, $3, $4, 'Delivery Active Sync', 'Approved', 'Just now', NOW(), TRUE)
+        `, [record.application_id, u.serial_number, u.company_id, 'System Bot']);
+      }
+    }
+
+    await query('COMMIT');
+
+    const updatedResult = await query(`
+      SELECT lt.application_id as "applicationId", lt.tracking_number as "trackingNumber",
+             lt.courier_name as "courierName", lt.current_location as "currentLocation",
+             lt.shipping_status as "shippingStatus", lt.stage, 
+             lt.last_updated as "lastUpdated",
+             u.serial_number as "serialNumber", u.battery_model as "batteryModel"
+      FROM logistics_tracking lt
+      LEFT JOIN units u ON lt.application_id = u.id
+      WHERE lt.tracking_number = $1
+    `, [trackingNumber]);
+
+    res.json(updatedResult.rows[0]);
+  } catch (error) {
+    await query('ROLLBACK');
+    console.error('Error simulating tracking:', error);
+    res.status(500).json({ error: 'Failed to simulate tracking update' });
+  }
+});
+
 // 14. AUTH LOGIN
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
@@ -423,6 +579,33 @@ const runMigrations = async () => {
   try {
     console.log('Running backend database self-migrations...');
     
+    // Ensure logistics_tracking table exists
+    await query(`
+      CREATE TABLE IF NOT EXISTS logistics_tracking (
+        application_id VARCHAR(50) PRIMARY KEY REFERENCES units(id) ON DELETE CASCADE,
+        tracking_number VARCHAR(100) NOT NULL UNIQUE,
+        courier_name VARCHAR(100) NOT NULL,
+        current_location VARCHAR(255) NOT NULL,
+        shipping_status VARCHAR(50) NOT NULL,
+        stage INTEGER NOT NULL DEFAULT 1,
+        last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Optionally auto-seed default tracking records if empty
+    const trackingCheck = await query("SELECT COUNT(*) FROM logistics_tracking");
+    if (parseInt(trackingCheck.rows[0].count, 10) === 0) {
+      console.log('Database logistics_tracking table is empty! Seeding default tracking records...');
+      const unitCheck = await query("SELECT id FROM units WHERE id IN ('NGY-26-071', 'NGY-26-072')");
+      if (unitCheck.rowCount >= 2) {
+        await query(`
+          INSERT INTO logistics_tracking (application_id, tracking_number, courier_name, current_location, shipping_status, stage) VALUES
+          ('NGY-26-071', 'RESI-DUMMY-01', 'JNE Express', 'Package handed over to courier at Central Warehouse', 'PREPARING', 1),
+          ('NGY-26-072', 'RESI-DUMMY-02', 'J&T Express', 'Package in transit to Sortation Center Jakarta', 'IN TRANSIT', 2);
+        `);
+      }
+    }
+
     // Ensure table structure has password column
     await query(`
       ALTER TABLE system_users ADD COLUMN IF NOT EXISTS password VARCHAR(255) NOT NULL DEFAULT 'password123';

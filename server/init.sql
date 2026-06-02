@@ -2,6 +2,7 @@
 
 -- Drop tables if they exist (for easy deployment re-runs)
 DROP TABLE IF EXISTS activity_logs CASCADE;
+DROP TABLE IF EXISTS logistics_tracking CASCADE;
 DROP TABLE IF EXISTS units CASCADE;
 DROP TABLE IF EXISTS companies CASCADE;
 DROP TABLE IF EXISTS system_users CASCADE;
@@ -60,6 +61,17 @@ CREATE TABLE activity_logs (
 CREATE TABLE settings (
     key VARCHAR(100) PRIMARY KEY,
     value JSONB NOT NULL
+);
+
+-- 6. Create Logistics Tracking Table
+CREATE TABLE logistics_tracking (
+    application_id VARCHAR(50) PRIMARY KEY REFERENCES units(id) ON DELETE CASCADE,
+    tracking_number VARCHAR(100) NOT NULL UNIQUE,
+    courier_name VARCHAR(100) NOT NULL,
+    current_location VARCHAR(255) NOT NULL,
+    shipping_status VARCHAR(50) NOT NULL,
+    stage INTEGER NOT NULL DEFAULT 1,
+    last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- --- SEED DATA ---
@@ -164,3 +176,8 @@ INSERT INTO activity_logs (unit_id, serial_number, company_id, processed_by, act
 INSERT INTO settings (key, value) VALUES
 ('battery_models', '["BAT-Z500 (Enterprise)", "BAT-X100 (Commercial)", "BAT-V200 (Industrial)"]'::jsonb),
 ('partners', '["Partner 1", "Partner 2", "Partner 3", "Partner 4"]'::jsonb);
+
+-- Seed Logistics Tracking
+INSERT INTO logistics_tracking (application_id, tracking_number, courier_name, current_location, shipping_status, stage) VALUES
+('NGY-26-071', 'RESI-DUMMY-01', 'JNE Express', 'Package handed over to courier at Central Warehouse', 'PREPARING', 1),
+('NGY-26-072', 'RESI-DUMMY-02', 'J&T Express', 'Package in transit to Sortation Center Jakarta', 'IN TRANSIT', 2);

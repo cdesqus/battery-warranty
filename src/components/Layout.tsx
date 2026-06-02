@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Database, ShieldCheck, BarChart3, Settings, Bell, CircleUser, X, AlertTriangle, ShieldAlert, History, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Database, ShieldCheck, BarChart3, Settings, Bell, CircleUser, X, AlertTriangle, ShieldAlert, History, LogOut, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { getRelativeTime } from '../utils/time';
 
@@ -26,6 +26,8 @@ const Layout = () => {
                 return 'Tools / Warranty Validation';
             case '/reporting':
                 return 'Analytics / Claims Reporting';
+            case '/logistics':
+                return 'Operations / Logistics & Delivery Tracking';
             case '/settings':
                 return 'Configuration / System Settings';
             default:
@@ -241,6 +243,23 @@ const Layout = () => {
                         {isSidebarCollapsed && (
                             <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
                                 Reports
+                            </div>
+                        )}
+                    </NavLink>
+
+                    <NavLink 
+                        to="/logistics" 
+                        className={({ isActive }) => `flex items-center rounded-lg transition-colors ${
+                            isSidebarCollapsed 
+                            ? 'justify-center p-3 relative group' 
+                            : 'gap-3 px-4 py-3'
+                        } ${isActive ? 'bg-white/10 font-semibold' : 'hover:bg-white/5 text-slate-300'}`}
+                    >
+                        <Truck size={20} className="shrink-0" />
+                        {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">Logistics Tracking</span>}
+                        {isSidebarCollapsed && (
+                            <div className="absolute left-full ml-4 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap shadow-xl z-50 translate-x-2 group-hover:translate-x-0">
+                                Logistics Tracking
                             </div>
                         )}
                     </NavLink>
