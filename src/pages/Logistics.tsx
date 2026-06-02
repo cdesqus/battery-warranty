@@ -25,7 +25,7 @@ const Logistics: React.FC = () => {
     const [toast, setToast] = useState<string | null>(null);
     const [isSimulatingId, setIsSimulatingId] = useState<string | null>(null);
 
-    const isDev = import.meta.env.MODE === 'development';
+    const isDev = true; // Enabled in all environments for staging/demo simulation support
 
     const showToastMsg = (msg: string) => {
         setToast(msg);

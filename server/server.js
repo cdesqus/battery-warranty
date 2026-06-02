@@ -434,10 +434,7 @@ app.post('/api/logistics', async (req, res) => {
 
 // Simulate API update (advanced sandbox stages 1 -> 2 -> 3 -> 4)
 app.post('/api/logistics/simulate', async (req, res) => {
-  // Allow simulation in development environment
-  if (process.env.NODE_ENV !== 'development') {
-    return res.status(403).json({ error: 'Simulation mode is restricted to development environment' });
-  }
+  // Simulation is enabled in all environments (development & production) for staging/demo support
 
   const { trackingNumber } = req.body;
   if (!trackingNumber) {
