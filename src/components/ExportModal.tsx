@@ -196,6 +196,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
 
             let rowCounter = 6;
             let sequenceNo = 1;
+            let totalSum = 0;
             companies.forEach(comp => {
                 comp.units.forEach(unit => {
                     let include = true;
@@ -218,6 +219,8 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                         const eDate = new Date(sDate);
                         eDate.setMonth(eDate.getMonth() + 24);
                         const status = getBatteryStatus(unit.contractStartDate, unit.claimCount);
+                        const finalPrice = unit.unitPrice * (1 - (unit.discount || 0));
+                        totalSum += finalPrice;
 
                         const rowValues = {
                             no: sequenceNo++,
@@ -225,7 +228,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                             appDate: unit.applicationDate ? new Date(unit.applicationDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
                             sn: unit.serialNumber || '-',
                             model: unit.batteryModel,
-                            price: unit.unitPrice * (1 - (unit.discount || 0)),
+                            price: finalPrice,
                             start: sDate,
                             end: eDate,
                             status: status.toUpperCase(),
@@ -279,7 +282,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
             const totalSumCell = grandTotalRow.getCell(6); 
             totalSumCell.value = {
                 formula: `=SUM(F6:F${totalRowIndex - 1})`,
-                date1904: false
+                result: totalSum
             };
             totalSumCell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
             totalSumCell.numFmt = '"Rp "#,##0';
