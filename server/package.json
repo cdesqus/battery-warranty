@@ -6,7 +6,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "reseed": "node reseed.js",
+    "patch": "node -e \"import('./db.js').then(m => m.query(require('fs').readFileSync('./patch_unit_types.sql','utf8'))).then(r => { console.log('Patch applied!'); console.table(r.rows); process.exit(0); }).catch(e => { console.error(e); process.exit(1); })\""
   },
   "dependencies": {
     "cors": "^2.8.5",
