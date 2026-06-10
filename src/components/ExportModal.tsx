@@ -54,7 +54,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
         try {
             // --- CSV BRANCH ---
             if (fileFormat === 'csv') {
-                const headers = ['No', 'Application ID', 'Application Date', 'Serial Number', 'Battery Model', 'Unit Price', 'Contract Date', 'End Date', 'Status', 'Partner'];
+                const headers = ['No', 'Application ID', 'Application Date', 'Serial Number', 'Unit Type', 'Unit Price', 'Contract Date', 'End Date', 'Status', 'Partner'];
                 const rows: any[] = [];
                 let seq = 1;
 
@@ -159,7 +159,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose }) => {
                 { header: 'Application ID', key: 'appId', width: 25 },
                 { header: 'Application Date', key: 'appDate', width: 20 },
                 { header: 'Serial Number', key: 'sn', width: 22 },
-                { header: 'Battery Model', key: 'model', width: 35 },
+                { header: 'Unit Type', key: 'model', width: 35 },
                 { header: 'Unit Price', key: 'price', width: 22 },
                 { header: 'Contract Date', key: 'start', width: 18 },
                 { header: 'End Date', key: 'end', width: 18 },

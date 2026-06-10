@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Truck, Package, Clock, CheckCircle2, Navigation, RefreshCw, X } from 'lucide-react';
+import { Search, Plus, Package, CheckCircle2, Navigation, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 const Logistics: React.FC = () => {
@@ -7,7 +7,7 @@ const Logistics: React.FC = () => {
         companies, 
         logistics, 
         addLogistics, 
-        simulateLogisticsUpdate, 
+        updateLogistics, 
         currentUser,
         isBackendAvailable
     } = useData();
@@ -18,14 +18,17 @@ const Logistics: React.FC = () => {
     
     // Form states
     const [selectedAppId, setSelectedAppId] = useState('');
+    const [shippingType, setShippingType] = useState<'INBOUND' | 'OUTBOUND'>('INBOUND');
     const [trackingNumber, setTrackingNumber] = useState('');
     const [courierName, setCourierName] = useState('JNE Express');
+    const [shippingStatus, setShippingStatus] = useState<'PREPARING' | 'IN_TRANSIT' | 'DELIVERED'>('PREPARING');
+    const [currentLocation, setCurrentLocation] = useState('Warranty Kit handed over to courier at Central Warehouse');
     
+    // Local state to keep track of location input field edits before blur/save
+    const [localLocations, setLocalLocations] = useState<Record<string, string>>({});
+
     // UX feedback states
     const [toast, setToast] = useState<string | null>(null);
-    const [isSimulatingId, setIsSimulatingId] = useState<string | null>(null);
-
-    const isDev = true; // Enabled in all environments for staging/demo simulation support
 
     const showToastMsg = (msg: string) => {
         setToast(msg);
@@ -58,7 +61,8 @@ const Logistics: React.FC = () => {
                 item.applicationId.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (item.serialNumber && item.serialNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (item.batteryModel && item.batteryModel.toLowerCase().includes(searchTerm.toLowerCase()));
+                (item.batteryModel && item.batteryModel.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                item.courierName.toLowerCase().includes(searchTerm.toLowerCase());
             
             const matchesStatus = 
                 selectedStatusFilter === 'All' || 
@@ -71,10 +75,10 @@ const Logistics: React.FC = () => {
     // Statistics counts
     const stats = useMemo(() => {
         const total = logistics.length;
-        const preparing = logistics.filter(l => l.shippingStatus === 'PREPARING').length;
-        const inTransit = logistics.filter(l => l.shippingStatus === 'IN TRANSIT').length;
+        const inbound = logistics.filter(l => l.shippingType === 'INBOUND').length;
+        const outbound = logistics.filter(l => l.shippingType === 'OUTBOUND').length;
         const delivered = logistics.filter(l => l.shippingStatus === 'DELIVERED').length;
-        return { total, preparing, inTransit, delivered };
+        return { total, inbound, outbound, delivered };
     }, [logistics]);
 
     const handleGenerateDummyTracking = () => {
@@ -84,41 +88,49 @@ const Logistics: React.FC = () => {
 
     const handleRegisterShipment = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedAppId || !trackingNumber || !courierName) return;
+        if (!selectedAppId || !trackingNumber || !courierName || !shippingStatus || !currentLocation) return;
 
         try {
-            await addLogistics(selectedAppId, trackingNumber, courierName);
+            await addLogistics(selectedAppId, shippingType, courierName, trackingNumber, shippingStatus, currentLocation);
             showToastMsg(`Shipment registered successfully for ${selectedAppId}!`);
             setShowRegisterModal(false);
             
             // Reset form
             setSelectedAppId('');
+            setShippingType('INBOUND');
             setTrackingNumber('');
             setCourierName('JNE Express');
+            setShippingStatus('PREPARING');
+            setCurrentLocation('Warranty Kit handed over to courier at Central Warehouse');
         } catch (err) {
             console.error(err);
             showToastMsg('Failed to register shipment');
         }
     };
 
-    const handleTriggerSimulation = async (trackNo: string) => {
-        setIsSimulatingId(trackNo);
+    const handleStatusChange = async (appId: string, newStatus: 'PREPARING' | 'IN_TRANSIT' | 'DELIVERED', currentLoc: string) => {
         try {
-            const updated = await simulateLogisticsUpdate(trackNo);
-            
-            let stageText = '';
-            switch (updated.stage) {
-                case 1: stageText = 'Package handed over (Stage 1)'; break;
-                case 2: stageText = 'In transit to sortation (Stage 2)'; break;
-                case 3: stageText = 'Out for delivery (Stage 3)'; break;
-                case 4: stageText = 'Delivered & Battery Activated (Stage 4)!'; break;
-            }
-            showToastMsg(stageText);
+            await updateLogistics(appId, newStatus, currentLoc);
+            showToastMsg(`Status updated to ${newStatus}`);
         } catch (err) {
             console.error(err);
-            showToastMsg('Simulation trigger failed');
-        } finally {
-            setIsSimulatingId(null);
+            showToastMsg('Failed to update status');
+        }
+    };
+
+    const handleLocationBlur = async (appId: string, currentStatus: 'PREPARING' | 'IN_TRANSIT' | 'DELIVERED', originalLoc: string) => {
+        const editedLoc = localLocations[appId];
+        if (editedLoc === undefined) return;
+        
+        const trimmed = editedLoc.trim();
+        if (trimmed === originalLoc) return;
+
+        try {
+            await updateLogistics(appId, currentStatus, trimmed);
+            showToastMsg('Location updated successfully');
+        } catch (err) {
+            console.error(err);
+            showToastMsg('Failed to update location');
         }
     };
 
@@ -129,16 +141,16 @@ const Logistics: React.FC = () => {
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
                 <div>
-                    <h1 className="text-2xl font-black text-[#1A2B4C] tracking-tight uppercase">Logistics & Delivery</h1>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">Monitor battery shipment schedules, courier pipelines, and real-time delivery handshakes.</p>
+                    <h1 className="text-2xl font-black text-[#1A2B4C] tracking-tight uppercase">Manual Logistics Tracking</h1>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">Directly update shipment stages, route type destinations, and physical warranty kit delivery states.</p>
                 </div>
                 
                 <div className="flex items-center gap-3">
                     {/* Database / Sandbox connection badge indicator */}
                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] uppercase tracking-wider font-black shadow-sm border ${
-                        isBackendAvailable 
-                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
-                            : 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                         isBackendAvailable 
+                             ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                             : 'bg-indigo-50 text-indigo-600 border-indigo-200'
                     }`}>
                         <span className={`w-2 h-2 rounded-full ${isBackendAvailable ? 'bg-emerald-500' : 'bg-indigo-500 animate-pulse'}`}></span>
                         {isBackendAvailable ? 'Live DB Synced' : 'Sandbox fallback'}
@@ -147,7 +159,7 @@ const Logistics: React.FC = () => {
                     {currentUser?.role !== 'Viewer' && (
                         <button
                             onClick={() => setShowRegisterModal(true)}
-                            className="flex items-center gap-2 bg-[#1A2B4C] hover:bg-[#253e6b] text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs uppercase tracking-wider shadow-lg shadow-[#1A2B4C]/25"
+                            className="flex items-center gap-2 bg-[#1A2B4C] hover:bg-[#253e6b] text-white px-4 py-2.5 rounded-xl font-bold transition-all text-xs uppercase tracking-wider shadow-lg shadow-[#1A2B4C]/25 cursor-pointer"
                         >
                             <Plus size={16} />
                             Register Shipment
@@ -176,29 +188,29 @@ const Logistics: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between shadow-sm relative overflow-hidden group hover:border-amber-500 transition-all duration-300">
+                <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between shadow-sm relative overflow-hidden group hover:border-indigo-500 transition-all duration-300">
                     <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Preparing Shipping</span>
-                        <span className="text-3xl font-black text-amber-600 mt-1 block">{stats.preparing}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Inbound (To Repair)</span>
+                        <span className="text-3xl font-black text-indigo-600 mt-1 block">{stats.inbound}</span>
                     </div>
-                    <div className="bg-amber-50 text-amber-600 p-3.5 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
-                        <Clock size={22} />
+                    <div className="bg-indigo-50 text-indigo-600 p-3.5 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                        <ArrowUpRight size={22} />
                     </div>
                 </div>
 
-                <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between shadow-sm relative overflow-hidden group hover:border-indigo-500 transition-all duration-300">
+                <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between shadow-sm relative overflow-hidden group hover:border-amber-500 transition-all duration-300">
                     <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">In Transit</span>
-                        <span className="text-3xl font-black text-indigo-600 mt-1 block">{stats.inTransit}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Outbound (To User)</span>
+                        <span className="text-3xl font-black text-amber-600 mt-1 block">{stats.outbound}</span>
                     </div>
-                    <div className="bg-indigo-50 text-indigo-600 p-3.5 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
-                        <Truck size={22} />
+                    <div className="bg-amber-50 text-amber-600 p-3.5 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
+                        <ArrowDownLeft size={22} />
                     </div>
                 </div>
 
                 <div className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between shadow-sm relative overflow-hidden group hover:border-emerald-500 transition-all duration-300">
                     <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Successfully Received</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Delivered & Closed</span>
                         <span className="text-3xl font-black text-emerald-600 mt-1 block">{stats.delivered}</span>
                     </div>
                     <div className="bg-emerald-50 text-emerald-600 p-3.5 rounded-2xl group-hover:bg-emerald-600 group-hover:text-white transition-colors duration-300">
@@ -225,7 +237,7 @@ const Logistics: React.FC = () => {
 
                     {/* Status Selectors */}
                     <div className="flex gap-1.5 shrink-0 overflow-x-auto pb-1 md:pb-0">
-                        {['All', 'PREPARING', 'IN TRANSIT', 'DELIVERED'].map((filter) => (
+                        {['All', 'PREPARING', 'IN_TRANSIT', 'DELIVERED'].map((filter) => (
                             <button
                                 key={filter}
                                 onClick={() => setSelectedStatusFilter(filter)}
@@ -235,7 +247,7 @@ const Logistics: React.FC = () => {
                                         : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700'
                                 }`}
                             >
-                                {filter}
+                                {filter.replace('_', ' ')}
                             </button>
                         ))}
                     </div>
@@ -247,13 +259,11 @@ const Logistics: React.FC = () => {
                         <thead className="sticky top-0 bg-slate-50 z-20 shadow-sm outline outline-1 outline-slate-100">
                             <tr className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                                 <th className="px-6 py-3.5">Logistics Asset</th>
+                                <th className="px-6 py-3.5">Shipping Type</th>
                                 <th className="px-6 py-3.5">Courier Channel</th>
-                                <th className="px-6 py-3.5">Current Progress Tracker</th>
-                                <th className="px-6 py-3.5 text-center">Status</th>
+                                <th className="px-6 py-3.5 text-center">Shipping Status</th>
+                                <th className="px-6 py-3.5">Current Location (Editable)</th>
                                 <th className="px-6 py-3.5 text-right">Last Updated</th>
-                                {isDev && currentUser?.role !== 'Viewer' && (
-                                    <th className="px-6 py-3.5 text-center bg-slate-50">Simulation Controls</th>
-                                )}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -271,6 +281,18 @@ const Logistics: React.FC = () => {
                                         </div>
                                     </td>
 
+                                    {/* Shipping Type Badges */}
+                                    <td className="px-6 py-4.5">
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border shadow-sm ${
+                                            item.shippingType === 'INBOUND'
+                                                ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                                : 'bg-amber-50 text-amber-600 border-amber-100'
+                                        }`}>
+                                            {item.shippingType === 'INBOUND' ? <ArrowUpRight size={12} /> : <ArrowDownLeft size={12} />}
+                                            {item.shippingType}
+                                        </span>
+                                    </td>
+
                                     {/* Courier Details */}
                                     <td className="px-6 py-4.5">
                                         <div className="flex flex-col">
@@ -281,64 +303,64 @@ const Logistics: React.FC = () => {
                                         </div>
                                     </td>
 
-                                    {/* Stepper visual progress */}
-                                    <td className="px-6 py-4.5 min-w-[320px]">
-                                        <div className="flex flex-col gap-2">
-                                            {/* Beautiful custom-tailored progressive stepper */}
-                                            <div className="flex items-center w-full max-w-[320px] relative px-1">
-                                                {/* Connecting timeline background */}
-                                                <div className="absolute top-[9px] left-3 right-3 h-1 bg-slate-100 rounded-full z-0"></div>
-                                                
-                                                {/* Active timeline overlay */}
-                                                <div 
-                                                    className="absolute top-[9px] left-3 h-1 bg-[#1A2B4C] rounded-full z-0 transition-all duration-500"
-                                                    style={{ width: `${((item.stage - 1) / 3) * 100}%` }}
-                                                ></div>
-
-                                                {/* Steps */}
-                                                {[1, 2, 3, 4].map((step) => {
-                                                    const isCompleted = step < item.stage;
-                                                    const isActive = step === item.stage;
-                                                    
-                                                    let nodeColor = 'bg-slate-200 border-slate-300 text-slate-400';
-                                                    if (isCompleted) {
-                                                        nodeColor = 'bg-[#1A2B4C] border-[#1A2B4C] text-white';
-                                                    } else if (isActive) {
-                                                        nodeColor = item.stage === 4 
-                                                            ? 'bg-emerald-600 border-emerald-600 text-white animate-pulse' 
-                                                            : 'bg-[#1A2B4C] border-[#1A2B4C] text-white ring-4 ring-[#1A2B4C]/25';
-                                                    }
-
-                                                    return (
-                                                        <div key={step} className="flex-1 flex justify-between last:flex-initial relative z-10">
-                                                            <div 
-                                                                className={`w-[22px] h-[22px] rounded-full flex items-center justify-center text-[9px] font-black border transition-all duration-300 ${nodeColor}`}
-                                                                title={`Stage ${step}`}
-                                                            >
-                                                                {step}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                            {/* Stage location description */}
-                                            <span className="text-[10px] font-semibold text-slate-600 max-w-[320px] truncate" title={item.currentLocation}>
-                                                {item.currentLocation}
+                                    {/* Shipping Status Dropdown */}
+                                    <td className="px-6 py-4.5 text-center">
+                                        {currentUser?.role !== 'Viewer' ? (
+                                            <select
+                                                value={item.shippingStatus}
+                                                onChange={(e) => handleStatusChange(
+                                                    item.applicationId, 
+                                                    e.target.value as any, 
+                                                    localLocations[item.applicationId] !== undefined ? localLocations[item.applicationId] : item.currentLocation
+                                                )}
+                                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/20 ${
+                                                    item.shippingStatus === 'DELIVERED' 
+                                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                                                        : item.shippingStatus === 'IN_TRANSIT'
+                                                            ? 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                                                            : 'bg-amber-50 text-amber-600 border-amber-200'
+                                                }`}
+                                            >
+                                                <option value="PREPARING">PREPARING</option>
+                                                <option value="IN_TRANSIT">IN TRANSIT</option>
+                                                <option value="DELIVERED">DELIVERED</option>
+                                            </select>
+                                        ) : (
+                                            <span className={`inline-flex items-center justify-center w-[100px] py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-sm ${
+                                                item.shippingStatus === 'DELIVERED' 
+                                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                                    : item.shippingStatus === 'IN_TRANSIT'
+                                                        ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                                                        : 'bg-amber-50 text-amber-600 border-amber-100'
+                                            }`}>
+                                                {item.shippingStatus.replace('_', ' ')}
                                             </span>
-                                        </div>
+                                        )}
                                     </td>
 
-                                    {/* Status Badge */}
-                                    <td className="px-6 py-4.5 text-center">
-                                        <span className={`inline-flex items-center justify-center w-[100px] py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm ${
-                                            item.shippingStatus === 'DELIVERED' 
-                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                                                : item.shippingStatus === 'IN TRANSIT'
-                                                    ? 'bg-indigo-50 text-indigo-600 border-indigo-100'
-                                                    : 'bg-amber-50 text-amber-600 border-amber-100'
-                                        }`}>
-                                            {item.shippingStatus}
-                                        </span>
+                                    {/* Editable Current Location */}
+                                    <td className="px-6 py-4.5 min-w-[280px]">
+                                        {currentUser?.role !== 'Viewer' ? (
+                                            <input
+                                                type="text"
+                                                className="w-full border border-slate-200 focus:border-[#1A2B4C] focus:ring-1 focus:ring-[#1A2B4C] rounded-xl px-3 py-1.5 text-xs font-semibold bg-slate-50/50 hover:bg-white transition-all focus:bg-white"
+                                                value={localLocations[item.applicationId] !== undefined ? localLocations[item.applicationId] : item.currentLocation}
+                                                onChange={(e) => setLocalLocations({
+                                                    ...localLocations,
+                                                    [item.applicationId]: e.target.value
+                                                })}
+                                                onBlur={() => handleLocationBlur(item.applicationId, item.shippingStatus, item.currentLocation)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        (e.target as HTMLInputElement).blur();
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <span className="text-xs font-semibold text-slate-600 block">
+                                                {item.currentLocation}
+                                            </span>
+                                        )}
                                     </td>
 
                                     {/* Last Updated Timestamp */}
@@ -355,34 +377,16 @@ const Logistics: React.FC = () => {
                                             })}
                                         </span>
                                     </td>
-
-                                    {/* Simulation action button */}
-                                    {isDev && currentUser?.role !== 'Viewer' && (
-                                        <td className="px-6 py-4.5 text-center bg-slate-50/70 border-l border-slate-100">
-                                            <button
-                                                onClick={() => handleTriggerSimulation(item.trackingNumber)}
-                                                disabled={isSimulatingId === item.trackingNumber}
-                                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-black text-[9px] uppercase tracking-wider transition-all shadow-sm cursor-pointer ${
-                                                    item.shippingStatus === 'DELIVERED'
-                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                                        : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:shadow-indigo-500/10'
-                                                }`}
-                                            >
-                                                <RefreshCw size={11} className={`${isSimulatingId === item.trackingNumber ? 'animate-spin' : ''}`} />
-                                                Simulate API Update
-                                            </button>
-                                        </td>
-                                    )}
                                 </tr>
                             ))}
 
                             {filteredLogistics.length === 0 && (
                                 <tr>
-                                    <td colSpan={isDev ? 6 : 5} className="text-center py-20 bg-slate-50/20 text-slate-400 font-medium">
+                                    <td colSpan={6} className="text-center py-20 bg-slate-50/20 text-slate-400 font-medium">
                                         <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
                                             <Navigation size={32} className="text-slate-300 animate-bounce" />
                                             <p className="text-xs font-black text-slate-500 uppercase tracking-widest mt-2">No shipments matched</p>
-                                            <p className="text-[11px] text-slate-400">Search by courier name, custom dummy tracking, or specific application references.</p>
+                                            <p className="text-[11px] text-slate-400">Search by courier name, custom tracking, or specific application references.</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -400,19 +404,19 @@ const Logistics: React.FC = () => {
                         <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
                                 <h3 className="font-black text-slate-800 text-lg tracking-tight uppercase">Logistics Registration</h3>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Link a courier tracking number to a registered battery SKU</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Link a manual courier tracking record to a claim</p>
                             </div>
                             <button 
                                 onClick={() => setShowRegisterModal(false)}
-                                className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-200 rounded-full transition-all"
+                                className="text-slate-400 hover:text-slate-600 p-2 hover:bg-slate-200 rounded-full transition-all cursor-pointer"
                             >
                                 <X size={20} />
                             </button>
                         </div>
 
                         {/* Form Submission */}
-                        <form onSubmit={handleRegisterShipment} className="p-8 space-y-6">
-                            {/* Battery selection Dropdown */}
+                        <form onSubmit={handleRegisterShipment} className="p-8 space-y-5">
+                            {/* Claim Selection */}
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Application reference ID <span className="text-rose-500">*</span></label>
                                 <select
@@ -428,11 +432,37 @@ const Logistics: React.FC = () => {
                                         </option>
                                     ))}
                                 </select>
-                                {untrackedUnits.length === 0 && (
-                                    <p className="text-[10px] text-amber-600 font-bold italic mt-1">
-                                        All registered units have already been linked to logistics tracking!
-                                    </p>
-                                )}
+                            </div>
+
+                            {/* Shipping Type */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Shipping Direction Type <span className="text-rose-500">*</span></label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShippingType('INBOUND')}
+                                        className={`py-3 rounded-xl text-xs font-bold uppercase tracking-wide border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                            shippingType === 'INBOUND'
+                                                ? 'bg-[#1A2B4C] text-white border-[#1A2B4C] shadow-md shadow-[#1A2B4C]/10'
+                                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <ArrowUpRight size={14} />
+                                        INBOUND (To Repair)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShippingType('OUTBOUND')}
+                                        className={`py-3 rounded-xl text-xs font-bold uppercase tracking-wide border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                            shippingType === 'OUTBOUND'
+                                                ? 'bg-[#1A2B4C] text-white border-[#1A2B4C] shadow-md shadow-[#1A2B4C]/10'
+                                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <ArrowDownLeft size={14} />
+                                        OUTBOUND (To User)
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Courier choice */}
@@ -454,15 +484,13 @@ const Logistics: React.FC = () => {
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
                                     <span>Courier Tracking Airway Bill (AWB) <span className="text-rose-500">*</span></span>
-                                    {isDev && (
-                                        <button
-                                            type="button"
-                                            onClick={handleGenerateDummyTracking}
-                                            className="text-[9px] text-indigo-600 hover:text-indigo-800 font-black tracking-widest uppercase hover:underline"
-                                        >
-                                            + Auto dummy
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleGenerateDummyTracking}
+                                        className="text-[9px] text-indigo-600 hover:text-indigo-800 font-black tracking-widest uppercase hover:underline cursor-pointer"
+                                    >
+                                        + Auto dummy
+                                    </button>
                                 </label>
                                 <input
                                     required
@@ -474,14 +502,43 @@ const Logistics: React.FC = () => {
                                 />
                             </div>
 
+                            {/* Status and Initial Location */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Initial Status <span className="text-rose-500">*</span></label>
+                                    <select
+                                        required
+                                        value={shippingStatus}
+                                        onChange={(e) => setShippingStatus(e.target.value as any)}
+                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/15 focus:border-[#1A2B4C] cursor-pointer"
+                                    >
+                                        <option value="PREPARING">PREPARING</option>
+                                        <option value="IN_TRANSIT">IN TRANSIT</option>
+                                        <option value="DELIVERED">DELIVERED</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Location <span className="text-rose-500">*</span></label>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Location (e.g. Sorting Center)"
+                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1A2B4C]/15 focus:border-[#1A2B4C]"
+                                        value={currentLocation}
+                                        onChange={(e) => setCurrentLocation(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
                             {/* Actions */}
                             <button
                                 type="submit"
-                                disabled={!selectedAppId || !trackingNumber}
-                                className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg ${
-                                    !selectedAppId || !trackingNumber
+                                disabled={!selectedAppId || !trackingNumber || !currentLocation}
+                                className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg cursor-pointer ${
+                                    !selectedAppId || !trackingNumber || !currentLocation
                                         ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
-                                        : 'bg-[#1A2B4C] text-white hover:bg-[#253e6b] hover:translate-y-[-2px]'
+                                        : 'bg-[#1A2B4C] text-white hover:bg-[#253e6b] hover:translate-y-[-2px] hover:shadow-[#1A2B4C]/20'
                                 }`}
                             >
                                 Confirm & Register Shipment

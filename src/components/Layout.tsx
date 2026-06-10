@@ -67,13 +67,11 @@ const Layout = () => {
             log.status.includes('Expired')
         ).map(log => {
             const unit = companies.flatMap(c => c.units).find(u => u.id === log.id || u.serialNumber === log.serialNumber);
-            const company = companies.find(c => c.id === log.company || c.units.some(u => u.id === log.id));
-            const partnerName = unit?.sourceChannel || 'Direct Channel';
-            const companyName = company?.companyName || 'Corporate Client';
+            const sourceChannel = unit?.sourceChannel || 'Direct Channel';
             return {
                 id: `log-${log.id}-${getRelativeTime(log.date)}`,
                 title: log.action.includes('Claim') ? 'Asset Claim Processed' : 'Policy Violation Blocked',
-                description: `Unit ${log.id} (SN: ${log.serialNumber || 'N/A'}) from ${partnerName} (${companyName}) is marked as ${log.status}.`,
+                description: `Unit ${log.id} (SN: ${log.serialNumber || 'N/A'}) via ${sourceChannel} is marked as ${log.status}.`,
                 type: log.status.includes('Rejected') ? 'REJECT' : 'CLAIM',
                 timestamp: getRelativeTime(log.date)
             };

@@ -64,13 +64,19 @@ CREATE TABLE settings (
 );
 
 -- 6. Create Logistics Tracking Table
+DROP TYPE IF EXISTS shipping_type_enum CASCADE;
+DROP TYPE IF EXISTS shipping_status_enum CASCADE;
+
+CREATE TYPE shipping_type_enum AS ENUM ('INBOUND', 'OUTBOUND');
+CREATE TYPE shipping_status_enum AS ENUM ('PREPARING', 'IN_TRANSIT', 'DELIVERED');
+
 CREATE TABLE logistics_tracking (
     application_id VARCHAR(50) PRIMARY KEY REFERENCES units(id) ON DELETE CASCADE,
-    tracking_number VARCHAR(100) NOT NULL UNIQUE,
-    courier_name VARCHAR(100) NOT NULL,
-    current_location VARCHAR(255) NOT NULL,
-    shipping_status VARCHAR(50) NOT NULL,
-    stage INTEGER NOT NULL DEFAULT 1,
+    shipping_type shipping_type_enum NOT NULL,
+    courier_name TEXT NOT NULL,
+    tracking_number TEXT NOT NULL,
+    shipping_status shipping_status_enum NOT NULL,
+    current_location TEXT NOT NULL,
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -112,46 +118,46 @@ INSERT INTO companies (id, company_name, pic_name, department, email) VALUES
 
 -- Seed Units
 INSERT INTO units (id, serial_number, battery_model, contract_start_date, claim_count, application_date, unit_price, discount, status_override, source_channel, company_id) VALUES
-('NGY-26-001', 'SN-100200', 'BAT-Z500 (Enterprise)', '2024-05-15', 0, '2024-05-15', 200000, 0.10, NULL, 'Partner 1', 'COMP-01'),
-('NGY-26-002', 'SN-100201', 'BAT-Z500 (Enterprise)', '2024-05-15', 0, '2024-05-15', 200000, 0.10, NULL, 'Partner 1', 'COMP-01'),
-('NGY-26-003', 'SN-100202', 'BAT-Z500 (Enterprise)', '2024-05-15', 1, '2024-05-16', 200000, 0.10, NULL, 'Partner 1', 'COMP-01'),
-('NGY-26-004', 'SN-200300', 'BAT-X100 (Commercial)', '2025-01-10', 0, '2025-01-10', 100000, 0.05, NULL, 'Partner 1', 'COMP-02'),
-('NGY-26-005', 'SN-200301', 'BAT-X100 (Commercial)', '2025-01-10', 0, '2025-01-11', 100000, 0.05, NULL, 'Partner 1', 'COMP-02'),
-('NGY-26-006', 'SN-300400', 'BAT-V200 (Industrial)', '2024-11-20', 0, '2024-11-20', 150000, 0.10, NULL, 'Partner 1', 'COMP-03'),
-('NGY-26-007', 'SN-400500', 'BAT-Z500 (Enterprise)', '2025-03-05', 0, '2025-03-05', 200000, 0.15, 'Rejected (Physical Damage)', 'Partner 1', 'COMP-04'),
-('NGY-26-008', 'SN-400501', 'BAT-Z500 (Enterprise)', '2025-03-05', 0, '2025-03-06', 200000, 0.15, 'Rejected (User Error)', 'Partner 1', 'COMP-04'),
-('NGY-26-009', 'SN-500600', 'BAT-X100 (Commercial)', '2024-08-22', 0, '2024-08-22', 100000, 0.05, NULL, 'Partner 2', 'COMP-05'),
-('NGY-26-010', 'SN-600700', 'BAT-V200 (Industrial)', '2025-06-12', 0, '2025-06-12', 150000, 0.10, NULL, 'Partner 2', 'COMP-06'),
-('NGY-26-011', 'SN-700801', 'BAT-Z500 (Enterprise)', '2024-10-01', 0, '2024-10-01', 200000, 0.10, NULL, 'Partner 2', 'COMP-07'),
-('NGY-26-012', 'SN-700802', 'BAT-Z500 (Enterprise)', '2024-10-01', 0, '2024-10-01', 200000, 0.10, NULL, 'Partner 2', 'COMP-07'),
-('NGY-26-013', 'SN-700803', 'BAT-Z500 (Enterprise)', '2024-10-01', 0, '2024-10-02', 200000, 0.10, NULL, 'Partner 2', 'COMP-07'),
-('NGY-26-014', 'SN-700804', 'BAT-X100 (Commercial)', '2024-10-01', 1, '2024-10-15', 100000, 0.10, NULL, 'Partner 2', 'COMP-07'),
-('NGY-26-015', 'SN-700805', 'BAT-X100 (Commercial)', '2023-01-01', 0, '2023-01-01', 100000, 0.10, NULL, 'Partner 2', 'COMP-07'),
-('NGY-26-016', 'SN-800900', 'BAT-Z500 (Enterprise)', '2026-02-14', 0, '2026-02-14', 200000, 0.10, NULL, 'Partner 2', 'COMP-08'),
-('NGY-26-017', 'SN-900011', 'BAT-X100 (Commercial)', '2025-11-22', 0, '2025-11-22', 100000, 0.05, NULL, 'Partner 3', 'COMP-09'),
-('NGY-26-018', 'SN-011122', 'BAT-V200 (Industrial)', '2024-04-30', 1, '2024-04-30', 150000, 0.10, NULL, 'Partner 3', 'COMP-10'),
-('NGY-26-019', 'SN-122233', 'BAT-Z500 (Enterprise)', '2025-12-05', 0, '2025-12-05', 200000, 0.10, NULL, 'Partner 3', 'COMP-11'),
-('NGY-26-020', 'SN-233344', 'BAT-X100 (Commercial)', '2024-07-18', 0, '2024-07-18', 100000, 0.05, NULL, 'Partner 3', 'COMP-12'),
-('NGY-26-021', 'SN-344455', 'BAT-V200 (Industrial)', '2025-05-10', 0, '2025-05-10', 150000, 0.10, NULL, 'Partner 3', 'COMP-13'),
-('NGY-26-022', 'SN-455566', 'BAT-Z500 (Enterprise)', '2024-03-25', 0, '2024-03-25', 200000, 0.10, NULL, 'Partner 3', 'COMP-14'),
-('NGY-26-023', 'SN-566677', 'BAT-X100 (Commercial)', '2026-01-30', 0, '2026-01-30', 100000, 0.15, NULL, 'Partner 3', 'COMP-15'),
-('NGY-26-024', 'SN-677788', 'BAT-V200 (Industrial)', '2025-08-12', 0, '2025-08-12', 150000, 0.05, NULL, 'Partner 3', 'COMP-16'),
-('NGY-26-025', 'SN-788899', 'BAT-Z500 (Enterprise)', '2024-09-18', 0, '2024-09-18', 200000, 0.10, NULL, 'Partner 4', 'COMP-17'),
-('NGY-26-026', 'SN-899900', 'BAT-X100 (Commercial)', '2025-02-22', 0, '2025-02-22', 100000, 0.10, NULL, 'Partner 4', 'COMP-18'),
-('NGY-26-027', 'SN-900027', 'BAT-V200 (Industrial)', '2024-12-05', 0, '2024-12-05', 150000, 0.05, NULL, 'Partner 4', 'COMP-19'),
-('NGY-26-028', 'SN-011128', 'BAT-Z500 (Enterprise)', '2025-04-18', 1, '2025-04-18', 200000, 0.10, NULL, 'Partner 4', 'COMP-20'),
-('NGY-26-029', 'SN-122239', 'BAT-X100 (Commercial)', '2024-06-10', 0, '2024-06-10', 100000, 0.10, NULL, 'Partner 4', 'COMP-21'),
-('NGY-26-030', 'SN-233349', 'BAT-V200 (Industrial)', '2025-09-01', 0, '2025-09-01', 150000, 0.10, NULL, 'Partner 4', 'COMP-22'),
-('NGY-26-031', 'SN-344459', 'BAT-Z500 (Enterprise)', '2024-11-20', 0, '2024-11-20', 200000, 0.15, NULL, 'Partner 4', 'COMP-23'),
-('NGY-26-032', 'SN-455569', 'BAT-X100 (Commercial)', '2025-03-05', 0, '2025-03-05', 100000, 0.05, NULL, 'Partner 4', 'COMP-24'),
-('NGY-26-065', 'SN-326556', 'BAT-Z500 (Enterprise)', '2026-04-12', 0, '2026-04-12', 200000, 0.10, 'Rejected (Physical Damage)', 'Partner 4', 'COMP-25'),
-('NGY-26-066', 'SN-437667', 'BAT-X100 (Commercial)', '2025-09-18', 1, '2025-09-18', 100000, 0.05, NULL, 'Partner 4', 'COMP-26'),
-('NGY-26-067', 'SN-548778', 'BAT-V200 (Industrial)', '2024-01-25', 0, '2024-01-25', 150000, 0.10, NULL, 'Partner 4', 'COMP-27'),
-('NGY-26-068', 'SN-659889', 'BAT-Z500 (Enterprise)', '2026-07-30', 0, '2026-07-30', 200000, 0.15, NULL, 'Partner 4', 'COMP-28'),
-('NGY-26-069', 'SN-760990', 'BAT-X100 (Commercial)', '2025-05-12', 0, '2025-05-12', 100000, 0.05, NULL, 'Partner 4', 'COMP-29'),
-('NGY-26-070', 'SN-871001', 'BAT-V200 (Industrial)', '2024-12-18', 0, '2024-12-18', 150000, 0.10, NULL, 'Partner 4', 'COMP-30'),
-('NGY-26-071', 'SN-982112', 'BAT-Z500 (Enterprise)', '2026-04-10', 0, '2026-04-10', 200000, 0.10, NULL, 'Partner 4', 'COMP-31'),
-('NGY-26-072', 'SN-982113', 'BAT-Z500 (Enterprise)', '2026-04-15', 0, '2026-04-15', 200000, 0.10, NULL, 'Partner 4', 'COMP-31');
+('NGY-26-001', 'SN-100200', 'iPhone 15 Pro', '2024-05-15', 0, '2024-05-15', 200000, 0.10, NULL, 'Partner 01', 'COMP-01'),
+('NGY-26-002', 'SN-100201', 'iPhone 15 Pro', '2024-05-15', 0, '2024-05-15', 200000, 0.10, NULL, 'Partner 01', 'COMP-01'),
+('NGY-26-003', 'SN-100202', 'iPhone 15 Pro', '2024-05-15', 1, '2024-05-16', 200000, 0.10, NULL, 'Partner 01', 'COMP-01'),
+('NGY-26-004', 'SN-200300', 'iPhone 15', '2025-01-10', 0, '2025-01-10', 100000, 0.05, NULL, 'Partner 01', 'COMP-02'),
+('NGY-26-005', 'SN-200301', 'iPhone 15', '2025-01-10', 0, '2025-01-11', 100000, 0.05, NULL, 'Partner 01', 'COMP-02'),
+('NGY-26-006', 'SN-300400', 'iPhone 14', '2024-11-20', 0, '2024-11-20', 150000, 0.10, NULL, 'Partner 01', 'COMP-03'),
+('NGY-26-007', 'SN-400500', 'iPhone 15 Pro', '2025-03-05', 0, '2025-03-05', 200000, 0.15, 'Rejected (Physical Damage)', 'Partner 01', 'COMP-04'),
+('NGY-26-008', 'SN-400501', 'iPhone 15 Pro', '2025-03-05', 0, '2025-03-06', 200000, 0.15, 'Rejected (User Error)', 'Partner 01', 'COMP-04'),
+('NGY-26-009', 'SN-500600', 'iPhone 15', '2024-08-22', 0, '2024-08-22', 100000, 0.05, NULL, 'Partner 02', 'COMP-05'),
+('NGY-26-010', 'SN-600700', 'iPhone 14', '2025-06-12', 0, '2025-06-12', 150000, 0.10, NULL, 'Partner 02', 'COMP-06'),
+('NGY-26-011', 'SN-700801', 'iPhone 15 Pro', '2024-10-01', 0, '2024-10-01', 200000, 0.10, NULL, 'Partner 02', 'COMP-07'),
+('NGY-26-012', 'SN-700802', 'iPhone 15 Pro', '2024-10-01', 0, '2024-10-01', 200000, 0.10, NULL, 'Partner 02', 'COMP-07'),
+('NGY-26-013', 'SN-700803', 'iPhone 15 Pro', '2024-10-01', 0, '2024-10-02', 200000, 0.10, NULL, 'Partner 02', 'COMP-07'),
+('NGY-26-014', 'SN-700804', 'iPhone 15', '2024-10-01', 1, '2024-10-15', 100000, 0.10, NULL, 'Partner 02', 'COMP-07'),
+('NGY-26-015', 'SN-700805', 'iPhone 15', '2023-01-01', 0, '2023-01-01', 100000, 0.10, NULL, 'Partner 02', 'COMP-07'),
+('NGY-26-016', 'SN-800900', 'iPhone 15 Pro', '2026-02-14', 0, '2026-02-14', 200000, 0.10, NULL, 'Partner 02', 'COMP-08'),
+('NGY-26-017', 'SN-900011', 'iPhone 15', '2025-11-22', 0, '2025-11-22', 100000, 0.05, NULL, 'Partner 03', 'COMP-09'),
+('NGY-26-018', 'SN-011122', 'iPhone 14', '2024-04-30', 1, '2024-04-30', 150000, 0.10, NULL, 'Partner 03', 'COMP-10'),
+('NGY-26-019', 'SN-122233', 'iPhone 15 Pro', '2025-12-05', 0, '2025-12-05', 200000, 0.10, NULL, 'Partner 03', 'COMP-11'),
+('NGY-26-020', 'SN-233344', 'iPhone 15', '2024-07-18', 0, '2024-07-18', 100000, 0.05, NULL, 'Partner 03', 'COMP-12'),
+('NGY-26-021', 'SN-344455', 'iPhone 14', '2025-05-10', 0, '2025-05-10', 150000, 0.10, NULL, 'Partner 03', 'COMP-13'),
+('NGY-26-022', 'SN-455566', 'iPhone 15 Pro', '2024-03-25', 0, '2024-03-25', 200000, 0.10, NULL, 'Partner 03', 'COMP-14'),
+('NGY-26-023', 'SN-566677', 'iPhone 15', '2026-01-30', 0, '2026-01-30', 100000, 0.15, NULL, 'Partner 03', 'COMP-15'),
+('NGY-26-024', 'SN-677788', 'iPhone 14', '2025-08-12', 0, '2025-08-12', 150000, 0.05, NULL, 'Partner 03', 'COMP-16'),
+('NGY-26-025', 'SN-788899', 'iPhone 15 Pro', '2024-09-18', 0, '2024-09-18', 200000, 0.10, NULL, 'Partner 04', 'COMP-17'),
+('NGY-26-026', 'SN-899900', 'iPhone 15', '2025-02-22', 0, '2025-02-22', 100000, 0.10, NULL, 'Partner 04', 'COMP-18'),
+('NGY-26-027', 'SN-900027', 'iPhone 14', '2024-12-05', 0, '2024-12-05', 150000, 0.05, NULL, 'Partner 04', 'COMP-19'),
+('NGY-26-028', 'SN-011128', 'iPhone 15 Pro', '2025-04-18', 1, '2025-04-18', 200000, 0.10, NULL, 'Partner 04', 'COMP-20'),
+('NGY-26-029', 'SN-122239', 'iPhone 15', '2024-06-10', 0, '2024-06-10', 100000, 0.10, NULL, 'Partner 04', 'COMP-21'),
+('NGY-26-030', 'SN-233349', 'iPhone 14', '2025-09-01', 0, '2025-09-01', 150000, 0.10, NULL, 'Partner 04', 'COMP-22'),
+('NGY-26-031', 'SN-344459', 'iPhone 15 Pro', '2024-11-20', 0, '2024-11-20', 200000, 0.15, NULL, 'Partner 04', 'COMP-23'),
+('NGY-26-032', 'SN-455569', 'iPhone 15', '2025-03-05', 0, '2025-03-05', 100000, 0.05, NULL, 'Partner 04', 'COMP-24'),
+('NGY-26-065', 'SN-326556', 'iPhone 15 Pro', '2026-04-12', 0, '2026-04-12', 200000, 0.10, 'Rejected (Physical Damage)', 'Partner 04', 'COMP-25'),
+('NGY-26-066', 'SN-437667', 'iPhone 15', '2025-09-18', 1, '2025-09-18', 100000, 0.05, NULL, 'Partner 04', 'COMP-26'),
+('NGY-26-067', 'SN-548778', 'iPhone 14', '2024-01-25', 0, '2024-01-25', 150000, 0.10, NULL, 'Partner 04', 'COMP-27'),
+('NGY-26-068', 'SN-659889', 'iPhone 15 Pro', '2026-07-30', 0, '2026-07-30', 200000, 0.15, NULL, 'Partner 04', 'COMP-28'),
+('NGY-26-069', 'SN-760990', 'iPhone 15', '2025-05-12', 0, '2025-05-12', 100000, 0.05, NULL, 'Partner 04', 'COMP-29'),
+('NGY-26-070', 'SN-871001', 'iPhone 14', '2024-12-18', 0, '2024-12-18', 150000, 0.10, NULL, 'Partner 04', 'COMP-30'),
+('NGY-26-071', 'SN-982112', 'iPhone 15 Pro', '2026-04-10', 0, '2026-04-10', 200000, 0.10, NULL, 'Partner 04', 'COMP-31'),
+('NGY-26-072', 'SN-982113', 'iPhone 15 Pro', '2026-04-15', 0, '2026-04-15', 200000, 0.10, NULL, 'Partner 04', 'COMP-31');
 
 -- Seed System Users
 INSERT INTO system_users (id, name, email, password, role, status, last_login) VALUES
@@ -174,10 +180,10 @@ INSERT INTO activity_logs (unit_id, serial_number, company_id, processed_by, act
 
 -- Seed Settings
 INSERT INTO settings (key, value) VALUES
-('battery_models', '["BAT-Z500 (Enterprise)", "BAT-X100 (Commercial)", "BAT-V200 (Industrial)"]'::jsonb),
-('partners', '["Partner 1", "Partner 2", "Partner 3", "Partner 4"]'::jsonb);
+('battery_models', '["iPhone 15 Pro", "iPhone 15", "iPhone 14"]'::jsonb),
+('partners', '["Partner 01", "Partner 02", "Partner 03", "Partner 04"]'::jsonb);
 
 -- Seed Logistics Tracking
-INSERT INTO logistics_tracking (application_id, tracking_number, courier_name, current_location, shipping_status, stage) VALUES
-('NGY-26-071', 'RESI-DUMMY-01', 'JNE Express', 'Package handed over to courier at Central Warehouse', 'PREPARING', 1),
-('NGY-26-072', 'RESI-DUMMY-02', 'J&T Express', 'Package in transit to Sortation Center Jakarta', 'IN TRANSIT', 2);
+INSERT INTO logistics_tracking (application_id, shipping_type, courier_name, tracking_number, shipping_status, current_location) VALUES
+('NGY-26-071', 'INBOUND', 'JNE Express', 'RESI-DUMMY-01', 'PREPARING', 'Warranty Kit handed over to courier at Central Warehouse'),
+('NGY-26-072', 'OUTBOUND', 'J&T Express', 'RESI-DUMMY-02', 'IN_TRANSIT', 'Warranty Kit in transit to Sortation Center Jakarta');

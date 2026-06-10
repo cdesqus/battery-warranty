@@ -201,7 +201,7 @@ const MasterData = () => {
 
     const handleDeleteUnit = (compId: string, unitId: string) => {
         if (currentUser.role !== 'Super Admin') return;
-        if (window.confirm('Are you sure you want to delete this battery unit?')) {
+        if (window.confirm('Are you sure you want to delete this unit?')) {
             setCompanies(prev => prev.map(c => {
                 if (c.id === compId) {
                     addActivityLog({ 
@@ -336,7 +336,7 @@ const MasterData = () => {
                             <th className="px-4 py-3 border-r border-slate-100">Application ID</th>
                             <th className="px-4 py-3 border-r border-slate-100">Application Date</th>
                             <th className="px-4 py-3 border-r border-slate-100">Serial Number</th>
-                            <th className="px-4 py-3 border-r border-slate-100">Battery Model</th>
+                            <th className="px-4 py-3 border-r border-slate-100">Unit Type</th>
                             <th className="px-4 py-3 border-r border-slate-100 text-right">Price (IDR)</th>
                             <th className="px-4 py-3 border-r border-slate-100 text-center">Contract</th>
                             <th className="px-4 py-3 border-r border-slate-100 text-center">End Date</th>
@@ -508,7 +508,7 @@ const MasterData = () => {
                         </div>
                         <div className="p-6 space-y-5">
                             <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Battery Model SKU</label>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Unit Type</label>
                                 <select value={formData.batteryModel} onChange={handleModelSelect} className="w-full border border-slate-200 rounded-lg px-4 py-3 text-sm font-semibold focus:outline-none focus:border-[#1A2B4C] bg-slate-50/50">
                                     {models.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>

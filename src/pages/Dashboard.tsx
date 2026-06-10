@@ -305,9 +305,9 @@ const Dashboard = () => {
 
             {/* Middle Section: Row 2 Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                {/* Left: Top Battery Models */}
+                {/* Left: Top Unit Models */}
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-                    <h3 className="font-bold text-slate-800 text-sm mb-4">Top Battery Models in Circulation</h3>
+                    <h3 className="font-bold text-slate-800 text-sm mb-4">Top Unit Models in Circulation</h3>
                     <div className="h-48 w-full flex-1">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart layout="vertical" data={topModels} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>

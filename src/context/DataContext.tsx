@@ -50,11 +50,11 @@ export interface ActivityLog {
 
 export interface LogisticsRecord {
     applicationId: string;
-    trackingNumber: string;
+    shippingType: 'INBOUND' | 'OUTBOUND';
     courierName: string;
+    trackingNumber: string;
+    shippingStatus: 'PREPARING' | 'IN_TRANSIT' | 'DELIVERED';
     currentLocation: string;
-    shippingStatus: string;
-    stage: number;
     lastUpdated: string;
     serialNumber?: string;
     batteryModel?: string;
@@ -82,8 +82,19 @@ export interface DataContextType {
     logout: () => void;
     logistics: LogisticsRecord[];
     setLogistics: React.Dispatch<React.SetStateAction<LogisticsRecord[]>>;
-    addLogistics: (applicationId: string, trackingNumber: string, courierName: string) => Promise<LogisticsRecord>;
-    simulateLogisticsUpdate: (trackingNumber: string) => Promise<LogisticsRecord>;
+    addLogistics: (
+        applicationId: string,
+        shippingType: 'INBOUND' | 'OUTBOUND',
+        courierName: string,
+        trackingNumber: string,
+        shippingStatus: 'PREPARING' | 'IN_TRANSIT' | 'DELIVERED',
+        currentLocation: string
+    ) => Promise<LogisticsRecord>;
+    updateLogistics: (
+        applicationId: string,
+        shippingStatus: 'PREPARING' | 'IN_TRANSIT' | 'DELIVERED',
+        currentLocation: string
+    ) => Promise<LogisticsRecord>;
 }
 
 // --- Utilities ---
@@ -104,60 +115,60 @@ export const getBatteryStatus = (installDate: string, claimCount: number, status
 
 const initialCompanies: CompanyAsset[] = [
     { id: 'COMP-01', companyName: 'PT. Logistik Maju', picName: 'Nur Rahma Atika', department: 'Logistics', email: 'nur.rahma@logistikmaju.com', units: [
-        { id: 'NGY-26-001', serialNumber: 'SN-100200', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-05-15', applicationDate: '2024-05-15', claimCount: 0, unitPrice: 200000, discount: 0.1 },
-        { id: 'NGY-26-002', serialNumber: 'SN-100201', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-05-15', applicationDate: '2024-05-15', claimCount: 0, unitPrice: 200000, discount: 0.1 },
-        { id: 'NGY-26-003', serialNumber: 'SN-100202', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-05-15', applicationDate: '2024-05-16', claimCount: 1, unitPrice: 200000, discount: 0.1 },
+        { id: 'NGY-26-001', serialNumber: 'SN-100200', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-05-15', applicationDate: '2024-05-15', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 01' },
+        { id: 'NGY-26-002', serialNumber: 'SN-100201', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-05-15', applicationDate: '2024-05-15', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 01' },
+        { id: 'NGY-26-003', serialNumber: 'SN-100202', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-05-15', applicationDate: '2024-05-16', claimCount: 1, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 01' },
     ]},
     { id: 'COMP-02', companyName: 'Mega Konstruksi Tbk', picName: 'Budi Santoso', department: 'Manufacturing', email: 'budi@megakonstruksi.com', units: [
-        { id: 'NGY-26-004', serialNumber: 'SN-200300', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2025-01-10', applicationDate: '2025-01-10', claimCount: 0, unitPrice: 100000, discount: 0.05 },
-        { id: 'NGY-26-005', serialNumber: 'SN-200301', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2025-01-10', applicationDate: '2025-01-11', claimCount: 0, unitPrice: 100000, discount: 0.05 },
+        { id: 'NGY-26-004', serialNumber: 'SN-200300', batteryModel: 'iPhone 15', contractStartDate: '2025-01-10', applicationDate: '2025-01-10', claimCount: 0, unitPrice: 100000, discount: 0.05, sourceChannel: 'Partner 01' },
+        { id: 'NGY-26-005', serialNumber: 'SN-200301', batteryModel: 'iPhone 15', contractStartDate: '2025-01-10', applicationDate: '2025-01-11', claimCount: 0, unitPrice: 100000, discount: 0.05, sourceChannel: 'Partner 01' },
     ]},
     { id: 'COMP-03', companyName: 'Healthy Care Hospital', picName: 'Siti Aminah', department: 'Healthcare', email: 'siti@healthycare.com', units: [
-        { id: 'NGY-26-006', serialNumber: 'SN-300400', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2024-11-20', applicationDate: '2024-11-20', claimCount: 0, unitPrice: 150000, discount: 0.1 },
+        { id: 'NGY-26-006', serialNumber: 'SN-300400', batteryModel: 'iPhone 14', contractStartDate: '2024-11-20', applicationDate: '2024-11-20', claimCount: 0, unitPrice: 150000, discount: 0.1, sourceChannel: 'Partner 01' },
     ]},
     { id: 'COMP-04', companyName: 'Global Manufacturing Solutions', picName: 'Andi Wijaya', department: 'Manufacturing', email: 'andi@globalmfg.com', units: [
-        { id: 'NGY-26-007', serialNumber: 'SN-400500', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2025-03-05', applicationDate: '2025-03-05', claimCount: 0, unitPrice: 200000, discount: 0.15, statusOverride: 'Rejected (Physical Damage)' },
-        { id: 'NGY-26-008', serialNumber: 'SN-400501', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2025-03-05', applicationDate: '2025-03-06', claimCount: 0, unitPrice: 200000, discount: 0.15, statusOverride: 'Rejected (User Error)' },
+        { id: 'NGY-26-007', serialNumber: 'SN-400500', batteryModel: 'iPhone 15 Pro', contractStartDate: '2025-03-05', applicationDate: '2025-03-05', claimCount: 0, unitPrice: 200000, discount: 0.15, statusOverride: 'Rejected (Physical Damage)', sourceChannel: 'Partner 01' },
+        { id: 'NGY-26-008', serialNumber: 'SN-400501', batteryModel: 'iPhone 15 Pro', contractStartDate: '2025-03-05', applicationDate: '2025-03-06', claimCount: 0, unitPrice: 200000, discount: 0.15, statusOverride: 'Rejected (User Error)', sourceChannel: 'Partner 01' },
     ]},
     { id: 'COMP-05', companyName: 'Apex Analytics', picName: 'Dewi Lestari', department: 'Data Centers', email: 'dewi@apex.com', units: [
-        { id: 'NGY-26-009', serialNumber: 'SN-500600', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2024-08-22', applicationDate: '2024-08-22', claimCount: 0, unitPrice: 100000, discount: 0.05 },
+        { id: 'NGY-26-009', serialNumber: 'SN-500600', batteryModel: 'iPhone 15', contractStartDate: '2024-08-22', applicationDate: '2024-08-22', claimCount: 0, unitPrice: 100000, discount: 0.05, sourceChannel: 'Partner 02' },
     ]},
     { id: 'COMP-06', companyName: 'CV. Sinar Tekno', picName: 'Rian Putra', department: 'IT Services', email: 'rian@sinartekno.com', units: [
-        { id: 'NGY-26-010', serialNumber: 'SN-600700', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2025-06-12', applicationDate: '2025-06-12', claimCount: 0, unitPrice: 150000, discount: 0.1 },
+        { id: 'NGY-26-010', serialNumber: 'SN-600700', batteryModel: 'iPhone 14', contractStartDate: '2025-06-12', applicationDate: '2025-06-12', claimCount: 0, unitPrice: 150000, discount: 0.1, sourceChannel: 'Partner 02' },
     ]},
     { id: 'COMP-07', companyName: 'PT. Tech Jaya', picName: 'Eka Sari', department: 'Data Centers', email: 'eka@techjaya.com', units: [
-        { id: 'NGY-26-011', serialNumber: 'SN-700801', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-10-01', applicationDate: '2024-10-01', claimCount: 0, unitPrice: 200000, discount: 0.1 },
-        { id: 'NGY-26-012', serialNumber: 'SN-700802', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-10-01', applicationDate: '2024-10-01', claimCount: 0, unitPrice: 200000, discount: 0.1 },
-        { id: 'NGY-26-013', serialNumber: 'SN-700803', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-10-01', applicationDate: '2024-10-02', claimCount: 0, unitPrice: 200000, discount: 0.1 },
-        { id: 'NGY-26-014', serialNumber: 'SN-700804', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2024-10-01', applicationDate: '2024-10-15', claimCount: 1, unitPrice: 100000, discount: 0.1 },
-        { id: 'NGY-26-015', serialNumber: 'SN-700805', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2023-01-01', applicationDate: '2023-01-01', claimCount: 0, unitPrice: 100000, discount: 0.1 },
+        { id: 'NGY-26-011', serialNumber: 'SN-700801', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-10-01', applicationDate: '2024-10-01', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 02' },
+        { id: 'NGY-26-012', serialNumber: 'SN-700802', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-10-01', applicationDate: '2024-10-01', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 02' },
+        { id: 'NGY-26-013', serialNumber: 'SN-700803', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-10-01', applicationDate: '2024-10-02', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 02' },
+        { id: 'NGY-26-014', serialNumber: 'SN-700804', batteryModel: 'iPhone 15', contractStartDate: '2024-10-01', applicationDate: '2024-10-15', claimCount: 1, unitPrice: 100000, discount: 0.1, sourceChannel: 'Partner 02' },
+        { id: 'NGY-26-015', serialNumber: 'SN-700805', batteryModel: 'iPhone 15', contractStartDate: '2023-01-01', applicationDate: '2023-01-01', claimCount: 0, unitPrice: 100000, discount: 0.1, sourceChannel: 'Partner 02' },
     ]},
-    { id: 'COMP-08', companyName: 'Zenith Ventures', picName: 'Ferry Salim', department: 'Finance', email: 'ferry@zenith.com', units: [{ id: 'NGY-26-016', serialNumber: 'SN-800900', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2026-02-14', applicationDate: '2026-02-14', claimCount: 0, unitPrice: 200000, discount: 0.1 }] },
-    { id: 'COMP-09', companyName: 'Trans Portindo', picName: 'Gita Permata', department: 'Logistics', email: 'gita@transport.com', units: [{ id: 'NGY-26-017', serialNumber: 'SN-900011', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2025-11-22', applicationDate: '2025-11-22', claimCount: 0, unitPrice: 100000, discount: 0.05 }] },
-    { id: 'COMP-10', companyName: 'Titik Terang PT', picName: 'Hadi Mulyo', department: 'Manufacturing', email: 'hadi@titikterang.com', units: [{ id: 'NGY-26-018', serialNumber: 'SN-011122', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2024-04-30', applicationDate: '2024-04-30', claimCount: 1, unitPrice: 150000, discount: 0.1 }] },
-    { id: 'COMP-11', companyName: 'Sinergy Group', picName: 'Indah Sari', department: 'Data Centers', email: 'indah@sinergy.com', units: [{ id: 'NGY-26-019', serialNumber: 'SN-122233', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2025-12-05', applicationDate: '2025-12-05', claimCount: 0, unitPrice: 200000, discount: 0.1 }] },
-    { id: 'COMP-12', companyName: 'Panca Niaga', picName: 'Jaka Pratama', department: 'Logistics', email: 'jaka@pancaniaga.com', units: [{ id: 'NGY-26-020', serialNumber: 'SN-233344', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2024-07-18', applicationDate: '2024-07-18', claimCount: 0, unitPrice: 100000, discount: 0.05 }] },
-    { id: 'COMP-13', companyName: 'Prima Agro', picName: 'Kurnia Wahyudi', department: 'Manufacturing', email: 'kurnia@primaagro.com', units: [{ id: 'NGY-26-021', serialNumber: 'SN-344455', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2025-05-10', applicationDate: '2025-05-10', claimCount: 0, unitPrice: 150000, discount: 0.1 }] },
-    { id: 'COMP-14', companyName: 'Duta Solusi', picName: 'Linda Wati', department: 'Healthcare', email: 'linda@dutasolusi.com', units: [{ id: 'NGY-26-022', serialNumber: 'SN-455566', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-03-25', applicationDate: '2024-03-25', claimCount: 0, unitPrice: 200000, discount: 0.1 }] },
-    { id: 'COMP-15', companyName: 'Karya Mandiri', picName: 'Mulyadi', department: 'Data Centers', email: 'mulyadi@karya.com', units: [{ id: 'NGY-26-023', serialNumber: 'SN-566677', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2026-01-30', applicationDate: '2026-01-30', claimCount: 0, unitPrice: 100000, discount: 0.15 }] },
-    { id: 'COMP-16', companyName: 'Nusa Gemilang', picName: 'Nina Sari', department: 'Logistics', email: 'nina@nusagemilang.com', units: [{ id: 'NGY-26-024', serialNumber: 'SN-677788', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2025-08-12', applicationDate: '2025-08-12', claimCount: 0, unitPrice: 150000, discount: 0.05 }] },
-    { id: 'COMP-17', companyName: 'Ocean Blue', picName: 'Oscar Wijaya', department: 'Manufacturing', email: 'oscar@oceanblue.com', units: [{ id: 'NGY-26-025', serialNumber: 'SN-788899', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-09-18', applicationDate: '2024-09-18', claimCount: 0, unitPrice: 200000, discount: 0.1 }] },
-    { id: 'COMP-18', companyName: 'Perkasa Indah', picName: 'Putri Rahayu', department: 'Healthcare', email: 'putri@perkasa.com', units: [{ id: 'NGY-26-026', serialNumber: 'SN-899900', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2025-02-22', applicationDate: '2025-02-22', claimCount: 0, unitPrice: 100000, discount: 0.1 }] },
-    { id: 'COMP-19', companyName: 'Quick Silver', picName: 'Qori Adilla', department: 'Data Centers', email: 'qori@quicksilver.com', units: [{ id: 'NGY-26-027', serialNumber: 'SN-900011', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2024-12-05', applicationDate: '2024-12-05', claimCount: 0, unitPrice: 150000, discount: 0.05 }] },
-    { id: 'COMP-20', companyName: 'Royal Garden', picName: 'Rizki Pratama', department: 'Logistics', email: 'rizki@royalgarden.com', units: [{ id: 'NGY-26-028', serialNumber: 'SN-011122', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2025-04-18', applicationDate: '2025-04-18', claimCount: 1, unitPrice: 200000, discount: 0.1 }] },
-    { id: 'COMP-21', companyName: 'Surya Abadi', picName: 'Siska Lestari', department: 'Manufacturing', email: 'siska@suryaabadi.com', units: [{ id: 'NGY-26-029', serialNumber: 'SN-122233', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2024-06-10', applicationDate: '2024-06-10', claimCount: 0, unitPrice: 100000, discount: 0.1 }] },
-    { id: 'COMP-22', companyName: 'Tunas Baru', picName: 'Tono Wijaya', department: 'Healthcare', email: 'tono@tunasbaru.com', units: [{ id: 'NGY-26-030', serialNumber: 'SN-233344', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2025-09-01', applicationDate: '2025-09-01', claimCount: 0, unitPrice: 150000, discount: 0.1 }] },
-    { id: 'COMP-23', companyName: 'Unicorp', picName: 'Umar Dani', department: 'Data Centers', email: 'umar@unicorp.com', units: [{ id: 'NGY-26-031', serialNumber: 'SN-344455', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2024-11-20', applicationDate: '2024-11-20', claimCount: 0, unitPrice: 200000, discount: 0.15 }] },
-    { id: 'COMP-24', companyName: 'Visi Global', picName: 'Vina Pandu', department: 'Manufacturing', email: 'vina@visiglobal.com', units: [{ id: 'NGY-26-032', serialNumber: 'SN-455566', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2025-03-05', applicationDate: '2025-03-05', claimCount: 0, unitPrice: 100000, discount: 0.05 }] },
-    { id: 'COMP-25', companyName: 'Celebes Shipping', picName: 'Rudi Saputra', department: 'Logistics', email: 'rudi@celebes.com', units: [{ id: 'NGY-26-065', serialNumber: 'SN-326556', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2026-04-12', applicationDate: '2026-04-12', claimCount: 0, unitPrice: 200000, discount: 0.1, statusOverride: 'Rejected (Physical Damage)' }] },
-    { id: 'COMP-26', companyName: 'Chemical Indutries', picName: 'Ayu Pratama', department: 'Manufacturing', email: 'ayu@chemical.com', units: [{ id: 'NGY-26-066', serialNumber: 'SN-437667', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2025-09-18', applicationDate: '2025-09-18', claimCount: 1, unitPrice: 100000, discount: 0.05 }] },
-    { id: 'COMP-27', companyName: 'Care Plus Medical', picName: 'Hendra Wijaya', department: 'Healthcare', email: 'hendra@careplus.com', units: [{ id: 'NGY-26-067', serialNumber: 'SN-548778', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2024-01-25', applicationDate: '2024-01-25', claimCount: 0, unitPrice: 150000, discount: 0.1 }] },
-    { id: 'COMP-28', companyName: 'Nexus Data System', picName: 'Lestari Pratama', department: 'Data Centers', email: 'lestari@nexus.com', units: [{ id: 'NGY-26-068', serialNumber: 'SN-659889', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2026-07-30', applicationDate: '2026-07-30', claimCount: 0, unitPrice: 200000, discount: 0.15 }] },
-    { id: 'COMP-29', companyName: 'Papua Trans', picName: 'Eko Wijaya', department: 'Logistics', email: 'eko@papuatrans.com', units: [{ id: 'NGY-26-069', serialNumber: 'SN-760990', batteryModel: 'BAT-X100 (Commercial)', contractStartDate: '2025-05-12', applicationDate: '2025-05-12', claimCount: 0, unitPrice: 100000, discount: 0.05 }] },
-    { id: 'COMP-30', companyName: 'Electronics Indo', picName: 'Santi Kusuma', department: 'Manufacturing', email: 'santi@electronics.com', units: [{ id: 'NGY-26-070', serialNumber: 'SN-871001', batteryModel: 'BAT-V200 (Industrial)', contractStartDate: '2024-12-18', applicationDate: '2024-12-18', claimCount: 0, unitPrice: 150000, discount: 0.1 }] },
+    { id: 'COMP-08', companyName: 'Zenith Ventures', picName: 'Ferry Salim', department: 'Finance', email: 'ferry@zenith.com', units: [{ id: 'NGY-26-016', serialNumber: 'SN-800900', batteryModel: 'iPhone 15 Pro', contractStartDate: '2026-02-14', applicationDate: '2026-02-14', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 02' }] },
+    { id: 'COMP-09', companyName: 'Trans Portindo', picName: 'Gita Permata', department: 'Logistics', email: 'gita@transport.com', units: [{ id: 'NGY-26-017', serialNumber: 'SN-900011', batteryModel: 'iPhone 15', contractStartDate: '2025-11-22', applicationDate: '2025-11-22', claimCount: 0, unitPrice: 100000, discount: 0.05, sourceChannel: 'Partner 03' }] },
+    { id: 'COMP-10', companyName: 'Titik Terang PT', picName: 'Hadi Mulyo', department: 'Manufacturing', email: 'hadi@titikterang.com', units: [{ id: 'NGY-26-018', serialNumber: 'SN-011122', batteryModel: 'iPhone 14', contractStartDate: '2024-04-30', applicationDate: '2024-04-30', claimCount: 1, unitPrice: 150000, discount: 0.1, sourceChannel: 'Partner 03' }] },
+    { id: 'COMP-11', companyName: 'Sinergy Group', picName: 'Indah Sari', department: 'Data Centers', email: 'indah@sinergy.com', units: [{ id: 'NGY-26-019', serialNumber: 'SN-122233', batteryModel: 'iPhone 15 Pro', contractStartDate: '2025-12-05', applicationDate: '2025-12-05', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 03' }] },
+    { id: 'COMP-12', companyName: 'Panca Niaga', picName: 'Jaka Pratama', department: 'Logistics', email: 'jaka@pancaniaga.com', units: [{ id: 'NGY-26-020', serialNumber: 'SN-233344', batteryModel: 'iPhone 15', contractStartDate: '2024-07-18', applicationDate: '2024-07-18', claimCount: 0, unitPrice: 100000, discount: 0.05, sourceChannel: 'Partner 03' }] },
+    { id: 'COMP-13', companyName: 'Prima Agro', picName: 'Kurnia Wahyudi', department: 'Manufacturing', email: 'kurnia@primaagro.com', units: [{ id: 'NGY-26-021', serialNumber: 'SN-344455', batteryModel: 'iPhone 14', contractStartDate: '2025-05-10', applicationDate: '2025-05-10', claimCount: 0, unitPrice: 150000, discount: 0.1, sourceChannel: 'Partner 03' }] },
+    { id: 'COMP-14', companyName: 'Duta Solusi', picName: 'Linda Wati', department: 'Healthcare', email: 'linda@dutasolusi.com', units: [{ id: 'NGY-26-022', serialNumber: 'SN-455566', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-03-25', applicationDate: '2024-03-25', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 03' }] },
+    { id: 'COMP-15', companyName: 'Karya Mandiri', picName: 'Mulyadi', department: 'Data Centers', email: 'mulyadi@karya.com', units: [{ id: 'NGY-26-023', serialNumber: 'SN-566677', batteryModel: 'iPhone 15', contractStartDate: '2026-01-30', applicationDate: '2026-01-30', claimCount: 0, unitPrice: 100000, discount: 0.15, sourceChannel: 'Partner 03' }] },
+    { id: 'COMP-16', companyName: 'Nusa Gemilang', picName: 'Nina Sari', department: 'Logistics', email: 'nina@nusagemilang.com', units: [{ id: 'NGY-26-024', serialNumber: 'SN-677788', batteryModel: 'iPhone 14', contractStartDate: '2025-08-12', applicationDate: '2025-08-12', claimCount: 0, unitPrice: 150000, discount: 0.05, sourceChannel: 'Partner 03' }] },
+    { id: 'COMP-17', companyName: 'Ocean Blue', picName: 'Oscar Wijaya', department: 'Manufacturing', email: 'oscar@oceanblue.com', units: [{ id: 'NGY-26-025', serialNumber: 'SN-788899', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-09-18', applicationDate: '2024-09-18', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-18', companyName: 'Perkasa Indah', picName: 'Putri Rahayu', department: 'Healthcare', email: 'putri@perkasa.com', units: [{ id: 'NGY-26-026', serialNumber: 'SN-899900', batteryModel: 'iPhone 15', contractStartDate: '2025-02-22', applicationDate: '2025-02-22', claimCount: 0, unitPrice: 100000, discount: 0.1, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-19', companyName: 'Quick Silver', picName: 'Qori Adilla', department: 'Data Centers', email: 'qori@quicksilver.com', units: [{ id: 'NGY-26-027', serialNumber: 'SN-900011', batteryModel: 'iPhone 14', contractStartDate: '2024-12-05', applicationDate: '2024-12-05', claimCount: 0, unitPrice: 150000, discount: 0.05, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-20', companyName: 'Royal Garden', picName: 'Rizki Pratama', department: 'Logistics', email: 'rizki@royalgarden.com', units: [{ id: 'NGY-26-028', serialNumber: 'SN-011122', batteryModel: 'iPhone 15 Pro', contractStartDate: '2025-04-18', applicationDate: '2025-04-18', claimCount: 1, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-21', companyName: 'Surya Abadi', picName: 'Siska Lestari', department: 'Manufacturing', email: 'siska@suryaabadi.com', units: [{ id: 'NGY-26-029', serialNumber: 'SN-122233', batteryModel: 'iPhone 15', contractStartDate: '2024-06-10', applicationDate: '2024-06-10', claimCount: 0, unitPrice: 100000, discount: 0.1, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-22', companyName: 'Tunas Baru', picName: 'Tono Wijaya', department: 'Healthcare', email: 'tono@tunasbaru.com', units: [{ id: 'NGY-26-030', serialNumber: 'SN-233344', batteryModel: 'iPhone 14', contractStartDate: '2025-09-01', applicationDate: '2025-09-01', claimCount: 0, unitPrice: 150000, discount: 0.1, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-23', companyName: 'Unicorp', picName: 'Umar Dani', department: 'Data Centers', email: 'umar@unicorp.com', units: [{ id: 'NGY-26-031', serialNumber: 'SN-344455', batteryModel: 'iPhone 15 Pro', contractStartDate: '2024-11-20', applicationDate: '2024-11-20', claimCount: 0, unitPrice: 200000, discount: 0.15, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-24', companyName: 'Visi Global', picName: 'Vina Pandu', department: 'Manufacturing', email: 'vina@visiglobal.com', units: [{ id: 'NGY-26-032', serialNumber: 'SN-455566', batteryModel: 'iPhone 15', contractStartDate: '2025-03-05', applicationDate: '2025-03-05', claimCount: 0, unitPrice: 100000, discount: 0.05, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-25', companyName: 'Celebes Shipping', picName: 'Rudi Saputra', department: 'Logistics', email: 'rudi@celebes.com', units: [{ id: 'NGY-26-065', serialNumber: 'SN-326556', batteryModel: 'iPhone 15 Pro', contractStartDate: '2026-04-12', applicationDate: '2026-04-12', claimCount: 0, unitPrice: 200000, discount: 0.1, statusOverride: 'Rejected (Physical Damage)', sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-26', companyName: 'Chemical Indutries', picName: 'Ayu Pratama', department: 'Manufacturing', email: 'ayu@chemical.com', units: [{ id: 'NGY-26-066', serialNumber: 'SN-437667', batteryModel: 'iPhone 15', contractStartDate: '2025-09-18', applicationDate: '2025-09-18', claimCount: 1, unitPrice: 100000, discount: 0.05, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-27', companyName: 'Care Plus Medical', picName: 'Hendra Wijaya', department: 'Healthcare', email: 'hendra@careplus.com', units: [{ id: 'NGY-26-067', serialNumber: 'SN-548778', batteryModel: 'iPhone 14', contractStartDate: '2024-01-25', applicationDate: '2024-01-25', claimCount: 0, unitPrice: 150000, discount: 0.1, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-28', companyName: 'Nexus Data System', picName: 'Lestari Pratama', department: 'Data Centers', email: 'lestari@nexus.com', units: [{ id: 'NGY-26-068', serialNumber: 'SN-659889', batteryModel: 'iPhone 15 Pro', contractStartDate: '2026-07-30', applicationDate: '2026-07-30', claimCount: 0, unitPrice: 200000, discount: 0.15, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-29', companyName: 'Papua Trans', picName: 'Eko Wijaya', department: 'Logistics', email: 'eko@papuatrans.com', units: [{ id: 'NGY-26-069', serialNumber: 'SN-760990', batteryModel: 'iPhone 15', contractStartDate: '2025-05-12', applicationDate: '2025-05-12', claimCount: 0, unitPrice: 100000, discount: 0.05, sourceChannel: 'Partner 04' }] },
+    { id: 'COMP-30', companyName: 'Electronics Indo', picName: 'Santi Kusuma', department: 'Manufacturing', email: 'santi@electronics.com', units: [{ id: 'NGY-26-070', serialNumber: 'SN-871001', batteryModel: 'iPhone 14', contractStartDate: '2024-12-18', applicationDate: '2024-12-18', claimCount: 0, unitPrice: 150000, discount: 0.1, sourceChannel: 'Partner 04' }] },
     { id: 'COMP-31', companyName: 'Bina Nusantara PT', picName: 'Andika Pratama', department: 'Logistics', email: 'andika@binanusantara.id', units: [
-        { id: 'NGY-26-071', serialNumber: 'SN-982112', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2026-04-10', applicationDate: '2026-04-10', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Source 1' },
-        { id: 'NGY-26-072', serialNumber: 'SN-982113', batteryModel: 'BAT-Z500 (Enterprise)', contractStartDate: '2026-04-15', applicationDate: '2026-04-15', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Source 1' }
+        { id: 'NGY-26-071', serialNumber: 'SN-982112', batteryModel: 'iPhone 15 Pro', contractStartDate: '2026-04-10', applicationDate: '2026-04-10', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 04' },
+        { id: 'NGY-26-072', serialNumber: 'SN-982113', batteryModel: 'iPhone 15 Pro', contractStartDate: '2026-04-15', applicationDate: '2026-04-15', claimCount: 0, unitPrice: 200000, discount: 0.1, sourceChannel: 'Partner 04' }
     ]}
 ];
 
@@ -176,8 +187,8 @@ const initialLogs: ActivityLog[] = [
 ];
 
 const initialLogistics: LogisticsRecord[] = [
-    { applicationId: 'NGY-26-071', trackingNumber: 'RESI-DUMMY-01', courierName: 'JNE Express', currentLocation: 'Package handed over to courier at Central Warehouse', shippingStatus: 'PREPARING', stage: 1, lastUpdated: new Date().toISOString(), serialNumber: 'SN-982112', batteryModel: 'BAT-Z500 (Enterprise)' },
-    { applicationId: 'NGY-26-072', trackingNumber: 'RESI-DUMMY-02', courierName: 'J&T Express', currentLocation: 'Package in transit to Sortation Center Jakarta', shippingStatus: 'IN TRANSIT', stage: 2, lastUpdated: new Date().toISOString(), serialNumber: 'SN-982113', batteryModel: 'BAT-Z500 (Enterprise)' }
+    { applicationId: 'NGY-26-071', shippingType: 'INBOUND', courierName: 'JNE Express', trackingNumber: 'RESI-DUMMY-01', shippingStatus: 'PREPARING', currentLocation: 'Warranty Kit handed over to courier at Central Warehouse', lastUpdated: new Date().toISOString(), serialNumber: 'SN-982112', batteryModel: 'iPhone 15 Pro' },
+    { applicationId: 'NGY-26-072', shippingType: 'OUTBOUND', courierName: 'J&T Express', trackingNumber: 'RESI-DUMMY-02', shippingStatus: 'IN_TRANSIT', currentLocation: 'Warranty Kit in transit to Sortation Center Jakarta', lastUpdated: new Date().toISOString(), serialNumber: 'SN-982113', batteryModel: 'iPhone 15 Pro' }
 ];
 
 export const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -205,8 +216,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return null;
     });
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(initialLogs);
-    const [models, setModelsState] = useState<string[]>(['BAT-Z500 (Enterprise)', 'BAT-X100 (Commercial)', 'BAT-V200 (Industrial)']);
-    const [sourceChannels, setSourceChannelsState] = useState<string[]>(['Source 1', 'Source 2', 'Source 3', 'Source 4']);
+    const [models, setModelsState] = useState<string[]>(['iPhone 15 Pro', 'iPhone 15', 'iPhone 14']);
+    const [sourceChannels, setSourceChannelsState] = useState<string[]>(['Partner 01', 'Partner 02', 'Partner 03', 'Partner 04']);
     const [selectedSource, setSelectedSource] = useState<string>('All Partners');
     const [isBackendAvailable, setIsBackendAvailable] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -578,10 +589,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         localStorage.removeItem('presales_user');
     };
 
-    const addLogistics = async (applicationId: string, trackingNumber: string, courierName: string): Promise<LogisticsRecord> => {
-        const defaultLocation = 'Package handed over to courier at Central Warehouse';
-        const defaultStatus = 'PREPARING';
-
+    const addLogistics = async (
+        applicationId: string,
+        shippingType: 'INBOUND' | 'OUTBOUND',
+        courierName: string,
+        trackingNumber: string,
+        shippingStatus: 'PREPARING' | 'IN_TRANSIT' | 'DELIVERED',
+        currentLocation: string
+    ): Promise<LogisticsRecord> => {
         // Find unit details locally to enrich the record
         let foundSerial = '';
         let foundModel = '';
@@ -595,11 +610,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         const newRecord: LogisticsRecord = {
             applicationId,
-            trackingNumber,
+            shippingType,
             courierName,
-            currentLocation: defaultLocation,
-            shippingStatus: defaultStatus,
-            stage: 1,
+            trackingNumber,
+            shippingStatus,
+            currentLocation,
             lastUpdated: new Date().toISOString(),
             serialNumber: foundSerial,
             batteryModel: foundModel
@@ -610,10 +625,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const res = await fetch(`${API_BASE}/logistics`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ applicationId, trackingNumber, courierName })
+                    body: JSON.stringify({ applicationId, shippingType, courierName, trackingNumber, shippingStatus, currentLocation })
                 });
                 if (res.ok) {
                     const data = await res.json();
+                    
+                    // Sync main status if DELIVERED
+                    if (shippingStatus === 'DELIVERED') {
+                        const statusToSet = shippingType === 'INBOUND' ? 'In Repair' : 'Closed';
+                        setCompaniesState(cPrev => cPrev.map(c => ({
+                            ...c,
+                            units: c.units.map(u => u.id === applicationId ? { ...u, statusOverride: statusToSet } : u)
+                        })));
+                    }
+
                     setLogisticsState(prev => {
                         const filtered = prev.filter(r => r.applicationId !== applicationId);
                         return [data, ...filtered];
@@ -625,7 +650,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         }
 
-        // Offline Sandbox
+        // Offline Sandbox Fallback
+        if (shippingStatus === 'DELIVERED') {
+            const statusToSet = shippingType === 'INBOUND' ? 'In Repair' : 'Closed';
+            setTimeout(() => {
+                setCompaniesState(cPrev => cPrev.map(c => ({
+                    ...c,
+                    units: c.units.map(u => u.id === applicationId ? { ...u, statusOverride: statusToSet } : u)
+                })));
+                
+                addActivityLog({
+                    id: applicationId,
+                    serialNumber: foundSerial || 'UNKNOWN',
+                    company: 'COMP-01',
+                    processedBy: 'System Bot',
+                    action: 'Delivery Active Sync',
+                    status: statusToSet,
+                    isBot: true
+                });
+            }, 0);
+        }
+
         setLogisticsState(prev => {
             const filtered = prev.filter(r => r.applicationId !== applicationId);
             return [newRecord, ...filtered];
@@ -633,82 +678,65 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return newRecord;
     };
 
-    const simulateLogisticsUpdate = async (trackingNumber: string): Promise<LogisticsRecord> => {
+    const updateLogistics = async (
+        applicationId: string,
+        shippingStatus: 'PREPARING' | 'IN_TRANSIT' | 'DELIVERED',
+        currentLocation: string
+    ): Promise<LogisticsRecord> => {
         if (isBackendAvailable) {
             try {
-                const res = await fetch(`${API_BASE}/logistics/simulate`, {
-                    method: 'POST',
+                const res = await fetch(`${API_BASE}/logistics/${applicationId}`, {
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trackingNumber })
+                    body: JSON.stringify({ shippingStatus, currentLocation })
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    setLogisticsState(prev => prev.map(r => r.trackingNumber === trackingNumber ? data : r));
                     
-                    // Trigger state update for units in frontend to sync immediately
-                    if (data.stage === 4) {
-                        setCompaniesState(prev => prev.map(c => ({
+                    // Update client-side unit status override if DELIVERED
+                    if (shippingStatus === 'DELIVERED') {
+                        const statusToSet = data.shippingType === 'INBOUND' ? 'In Repair' : 'Closed';
+                        setCompaniesState(cPrev => cPrev.map(c => ({
                             ...c,
-                            units: c.units.map(u => u.id === data.applicationId ? { ...u, statusOverride: 'Active' } : u)
+                            units: c.units.map(u => u.id === applicationId ? { ...u, statusOverride: statusToSet } : u)
                         })));
                     }
+
+                    setLogisticsState(prev => prev.map(r => r.applicationId === applicationId ? data : r));
                     return data;
                 }
             } catch (err) {
-                console.error('Failed to simulate backend logistics update, falling back to local:', err);
+                console.error('Failed to update backend logistics, falling back to local:', err);
             }
         }
 
         // Offline Sandbox Fallback
         let updatedRecord: LogisticsRecord | null = null;
         setLogisticsState(prev => prev.map(r => {
-            if (r.trackingNumber === trackingNumber) {
-                let nextStage = (r.stage % 4) + 1;
-                let nextLocation = '';
-                let nextStatus = '';
-
-                switch (nextStage) {
-                    case 1:
-                        nextLocation = 'Package handed over to courier at Central Warehouse';
-                        nextStatus = 'PREPARING';
-                        break;
-                    case 2:
-                        nextLocation = 'Package in transit to Sortation Center Jakarta';
-                        nextStatus = 'IN TRANSIT';
-                        break;
-                    case 3:
-                        nextLocation = 'Package is out for delivery by courier to partner site';
-                        nextStatus = 'IN TRANSIT';
-                        break;
-                    case 4:
-                        nextLocation = 'Package successfully received by Partner representative';
-                        nextStatus = 'DELIVERED';
-                        break;
-                }
-
+            if (r.applicationId === applicationId) {
                 updatedRecord = {
                     ...r,
-                    stage: nextStage,
-                    currentLocation: nextLocation,
-                    shippingStatus: nextStatus,
+                    shippingStatus,
+                    currentLocation,
                     lastUpdated: new Date().toISOString()
                 };
 
-                // If Stage 4, activate unit locally
-                if (nextStage === 4) {
+                // Sync main status if DELIVERED
+                if (shippingStatus === 'DELIVERED') {
+                    const statusToSet = r.shippingType === 'INBOUND' ? 'In Repair' : 'Closed';
                     setTimeout(() => {
                         setCompaniesState(cPrev => cPrev.map(c => ({
                             ...c,
-                            units: c.units.map(u => u.id === r.applicationId ? { ...u, statusOverride: 'Active' } : u)
+                            units: c.units.map(u => u.id === applicationId ? { ...u, statusOverride: statusToSet } : u)
                         })));
                         
                         addActivityLog({
-                            id: r.applicationId,
+                            id: applicationId,
                             serialNumber: r.serialNumber || 'UNKNOWN',
                             company: 'COMP-01',
                             processedBy: 'System Bot',
                             action: 'Delivery Active Sync',
-                            status: 'Approved',
+                            status: statusToSet,
                             isBot: true
                         });
                     }, 0);
@@ -720,7 +748,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }));
 
         if (!updatedRecord) {
-            throw new Error('Tracking number not found');
+            throw new Error('Application ID not found in logistics tracking');
         }
         return updatedRecord;
     };
@@ -749,7 +777,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             logistics,
             setLogistics: setLogisticsState as React.Dispatch<React.SetStateAction<LogisticsRecord[]>>,
             addLogistics,
-            simulateLogisticsUpdate
+            updateLogistics
         }}>
             {isLoading ? (
                 <div className="fixed inset-0 bg-[#0F172A] flex flex-col items-center justify-center text-white z-[9999] gap-4">

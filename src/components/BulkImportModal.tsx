@@ -57,7 +57,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
         worksheet.columns = [
             { header: 'Application ID', key: 'id', width: 20 },
             { header: 'Serial Number', key: 'sn', width: 20 },
-            { header: 'Battery Model', key: 'model', width: 25 },
+            { header: 'Unit Type', key: 'model', width: 25 },
             { header: 'Application Date', key: 'appDate', width: 15 },
             { header: 'Contract Start Date', key: 'startDate', width: 15 },
             { header: 'Unit Price', key: 'price', width: 15 },
@@ -165,7 +165,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose }) =>
             }
 
             // Map other columns with robust fallbacks
-            const rawModel = row['Battery Model'] || row['BatteryModel'] || row['battery_model'] || row['Model'] || row['model'] || row['Tipe'] || row['Tipe Baterai'] || 'Unknown';
+            const rawModel = row['Unit Type'] || row['UnitType'] || row['unit_type'] || row['Battery Model'] || row['BatteryModel'] || row['battery_model'] || row['Model'] || row['model'] || row['Tipe'] || row['Tipe Baterai'] || 'Unknown';
             const rawAppDate = row['Application Date'] || row['ApplicationDate'] || row['application_date'] || row['App Date'] || row['appDate'] || row['Tanggal'];
             const rawStartDate = row['Contract Start Date'] || row['ContractStartDate'] || row['contract_start_date'] || row['Start Date'] || row['startDate'] || row['Mulai Kontrak'];
             const rawPrice = row['Unit Price'] || row['UnitPrice'] || row['unit_price'] || row['Price'] || row['price'] || row['Harga'] || '0';

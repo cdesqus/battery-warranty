@@ -20,8 +20,14 @@ app.use((req, res, next) => {
 // --- API ROUTES ---
 
 // Healthcheck
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
+app.get('/api/health', async (req, res) => {
+  try {
+    await query('SELECT 1');
+    res.json({ status: 'ok', timestamp: new Date() });
+  } catch (err) {
+    console.error('Healthcheck database connection failed:', err.message);
+    res.status(500).json({ status: 'degraded', error: 'Database connection failed', timestamp: new Date() });
+  }
 });
 
 // 1. GET ALL COMPANIES (including nested Units)
@@ -375,9 +381,9 @@ app.post('/api/settings/reset', async (req, res) => {
 app.get('/api/logistics', async (req, res) => {
   try {
     const result = await query(`
-      SELECT lt.application_id as "applicationId", lt.tracking_number as "trackingNumber",
-             lt.courier_name as "courierName", lt.current_location as "currentLocation",
-             lt.shipping_status as "shippingStatus", lt.stage, 
+      SELECT lt.application_id as "applicationId", lt.shipping_type as "shippingType",
+             lt.courier_name as "courierName", lt.tracking_number as "trackingNumber",
+             lt.shipping_status as "shippingStatus", lt.current_location as "currentLocation",
              lt.last_updated as "lastUpdated",
              u.serial_number as "serialNumber", u.battery_model as "batteryModel"
       FROM logistics_tracking lt
@@ -391,33 +397,57 @@ app.get('/api/logistics', async (req, res) => {
   }
 });
 
-// Create a new tracking link for a unit
+// Create/Register a new tracking record for a unit
 app.post('/api/logistics', async (req, res) => {
-  const { applicationId, trackingNumber, courierName } = req.body;
-  if (!applicationId || !trackingNumber || !courierName) {
+  const { applicationId, shippingType, courierName, trackingNumber, shippingStatus, currentLocation } = req.body;
+  if (!applicationId || !shippingType || !courierName || !trackingNumber || !shippingStatus || !currentLocation) {
     return res.status(400).json({ error: 'Missing required tracking details' });
   }
   
   try {
-    const defaultLocation = 'Package handed over to courier at Central Warehouse';
-    const defaultStatus = 'PREPARING';
-    
+    await query('BEGIN');
+
     await query(`
-      INSERT INTO logistics_tracking (application_id, tracking_number, courier_name, current_location, shipping_status, stage)
-      VALUES ($1, $2, $3, $4, $5, 1)
+      INSERT INTO logistics_tracking (application_id, shipping_type, courier_name, tracking_number, shipping_status, current_location)
+      VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (application_id) 
-      DO UPDATE SET tracking_number = EXCLUDED.tracking_number, 
+      DO UPDATE SET shipping_type = EXCLUDED.shipping_type, 
                     courier_name = EXCLUDED.courier_name,
-                    current_location = EXCLUDED.current_location,
+                    tracking_number = EXCLUDED.tracking_number,
                     shipping_status = EXCLUDED.shipping_status,
-                    stage = 1,
+                    current_location = EXCLUDED.current_location,
                     last_updated = NOW()
-    `, [applicationId, trackingNumber, courierName, defaultLocation, defaultStatus]);
+    `, [applicationId, shippingType, courierName, trackingNumber, shippingStatus, currentLocation]);
+
+    // Handle status triggers on initial creation if status is DELIVERED
+    let statusOverrideToSet = null;
+    if (shippingStatus === 'DELIVERED') {
+      if (shippingType === 'INBOUND') {
+        statusOverrideToSet = 'In Repair';
+      } else if (shippingType === 'OUTBOUND') {
+        statusOverrideToSet = 'Closed';
+      }
+    }
+
+    if (statusOverrideToSet) {
+      await query("UPDATE units SET status_override = $1 WHERE id = $2", [statusOverrideToSet, applicationId]);
+      
+      const unitResult = await query("SELECT serial_number, company_id FROM units WHERE id = $1", [applicationId]);
+      if (unitResult.rowCount > 0) {
+        const u = unitResult.rows[0];
+        await query(`
+          INSERT INTO activity_logs (unit_id, serial_number, company_id, processed_by, action, status, timestamp, date, is_bot)
+          VALUES ($1, $2, $3, $4, 'Delivery Active Sync', $5, 'Just now', NOW(), TRUE)
+        `, [applicationId, u.serial_number, u.company_id, 'System Bot', statusOverrideToSet]);
+      }
+    }
+
+    await query('COMMIT');
     
     const joinedResult = await query(`
-      SELECT lt.application_id as "applicationId", lt.tracking_number as "trackingNumber",
-             lt.courier_name as "courierName", lt.current_location as "currentLocation",
-             lt.shipping_status as "shippingStatus", lt.stage, 
+      SELECT lt.application_id as "applicationId", lt.shipping_type as "shippingType",
+             lt.courier_name as "courierName", lt.tracking_number as "trackingNumber",
+             lt.shipping_status as "shippingStatus", lt.current_location as "currentLocation",
              lt.last_updated as "lastUpdated",
              u.serial_number as "serialNumber", u.battery_model as "batteryModel"
       FROM logistics_tracking lt
@@ -427,98 +457,78 @@ app.post('/api/logistics', async (req, res) => {
     
     res.status(201).json(joinedResult.rows[0]);
   } catch (error) {
+    await query('ROLLBACK');
     console.error('Error creating tracking:', error);
     res.status(500).json({ error: 'Failed to create tracking record' });
   }
 });
 
-// Simulate API update (advanced sandbox stages 1 -> 2 -> 3 -> 4)
-app.post('/api/logistics/simulate', async (req, res) => {
-  // Simulation is enabled in all environments (development & production) for staging/demo support
+// Update an existing logistics tracking record manually
+app.put('/api/logistics/:applicationId', async (req, res) => {
+  const { applicationId } = req.params;
+  const { shippingStatus, currentLocation } = req.body;
 
-  const { trackingNumber } = req.body;
-  if (!trackingNumber) {
-    return res.status(400).json({ error: 'Tracking number is required' });
+  if (!shippingStatus || !currentLocation) {
+    return res.status(400).json({ error: 'Missing required status or location' });
   }
-
+  
   try {
-    const recordResult = await query(
-      "SELECT * FROM logistics_tracking WHERE tracking_number = $1",
-      [trackingNumber]
-    );
-
-    if (recordResult.rowCount === 0) {
+    await query('BEGIN');
+    
+    const checkRes = await query("SELECT shipping_type FROM logistics_tracking WHERE application_id = $1", [applicationId]);
+    if (checkRes.rowCount === 0) {
+      await query('ROLLBACK');
       return res.status(404).json({ error: 'Tracking record not found' });
     }
-
-    const record = recordResult.rows[0];
-    let nextStage = (record.stage % 4) + 1; // Cycle 1 -> 2 -> 3 -> 4 -> 1
-
-    let nextLocation = '';
-    let nextStatus = '';
-
-    switch (nextStage) {
-      case 1:
-        nextLocation = 'Package handed over to courier at Central Warehouse';
-        nextStatus = 'PREPARING';
-        break;
-      case 2:
-        nextLocation = 'Package in transit to Sortation Center Jakarta';
-        nextStatus = 'IN TRANSIT';
-        break;
-      case 3:
-        nextLocation = 'Package is out for delivery by courier to partner site';
-        nextStatus = 'IN TRANSIT';
-        break;
-      case 4:
-        nextLocation = 'Package successfully received by Partner representative';
-        nextStatus = 'DELIVERED';
-        break;
-    }
-
-    await query('BEGIN');
-
+    
+    const { shipping_type } = checkRes.rows[0];
+    
     await query(`
       UPDATE logistics_tracking
-      SET stage = $1, current_location = $2, shipping_status = $3, last_updated = NOW()
-      WHERE tracking_number = $4
-    `, [nextStage, nextLocation, nextStatus, trackingNumber]);
-
-    // If hits DELIVERED (Stage 4), automatically activate the warranty
-    if (nextStage === 4) {
-      await query(
-        "UPDATE units SET status_override = 'Active' WHERE id = $1",
-        [record.application_id]
-      );
+      SET shipping_status = $1, current_location = $2, last_updated = NOW()
+      WHERE application_id = $3
+    `, [shippingStatus, currentLocation, applicationId]);
+    
+    let statusOverrideToSet = null;
+    if (shippingStatus === 'DELIVERED') {
+      if (shipping_type === 'INBOUND') {
+        statusOverrideToSet = 'In Repair';
+      } else if (shipping_type === 'OUTBOUND') {
+        statusOverrideToSet = 'Closed';
+      }
+    }
+    
+    if (statusOverrideToSet) {
+      await query("UPDATE units SET status_override = $1 WHERE id = $2", [statusOverrideToSet, applicationId]);
       
-      const unitResult = await query("SELECT serial_number, company_id FROM units WHERE id = $1", [record.application_id]);
+      const unitResult = await query("SELECT serial_number, company_id FROM units WHERE id = $1", [applicationId]);
       if (unitResult.rowCount > 0) {
         const u = unitResult.rows[0];
         await query(`
           INSERT INTO activity_logs (unit_id, serial_number, company_id, processed_by, action, status, timestamp, date, is_bot)
-          VALUES ($1, $2, $3, $4, 'Delivery Active Sync', 'Approved', 'Just now', NOW(), TRUE)
-        `, [record.application_id, u.serial_number, u.company_id, 'System Bot']);
+          VALUES ($1, $2, $3, $4, 'Delivery Active Sync', $5, 'Just now', NOW(), TRUE)
+        `, [applicationId, u.serial_number, u.company_id, 'System Bot', statusOverrideToSet]);
       }
     }
-
+    
     await query('COMMIT');
-
-    const updatedResult = await query(`
-      SELECT lt.application_id as "applicationId", lt.tracking_number as "trackingNumber",
-             lt.courier_name as "courierName", lt.current_location as "currentLocation",
-             lt.shipping_status as "shippingStatus", lt.stage, 
+    
+    const joinedResult = await query(`
+      SELECT lt.application_id as "applicationId", lt.shipping_type as "shippingType",
+             lt.courier_name as "courierName", lt.tracking_number as "trackingNumber",
+             lt.shipping_status as "shippingStatus", lt.current_location as "currentLocation",
              lt.last_updated as "lastUpdated",
              u.serial_number as "serialNumber", u.battery_model as "batteryModel"
       FROM logistics_tracking lt
       LEFT JOIN units u ON lt.application_id = u.id
-      WHERE lt.tracking_number = $1
-    `, [trackingNumber]);
-
-    res.json(updatedResult.rows[0]);
+      WHERE lt.application_id = $1
+    `, [applicationId]);
+    
+    res.json(joinedResult.rows[0]);
   } catch (error) {
     await query('ROLLBACK');
-    console.error('Error simulating tracking:', error);
-    res.status(500).json({ error: 'Failed to simulate tracking update' });
+    console.error('Error updating logistics:', error);
+    res.status(500).json({ error: 'Failed to update tracking record' });
   }
 });
 
@@ -576,15 +586,22 @@ const runMigrations = async () => {
   try {
     console.log('Running backend database self-migrations...');
     
-    // Ensure logistics_tracking table exists
+    // Ensure logistics_tracking table exists with correct schema
     await query(`
-      CREATE TABLE IF NOT EXISTS logistics_tracking (
+      DROP TABLE IF EXISTS logistics_tracking CASCADE;
+      DROP TYPE IF EXISTS shipping_type_enum CASCADE;
+      DROP TYPE IF EXISTS shipping_status_enum CASCADE;
+
+      CREATE TYPE shipping_type_enum AS ENUM ('INBOUND', 'OUTBOUND');
+      CREATE TYPE shipping_status_enum AS ENUM ('PREPARING', 'IN_TRANSIT', 'DELIVERED');
+
+      CREATE TABLE logistics_tracking (
         application_id VARCHAR(50) PRIMARY KEY REFERENCES units(id) ON DELETE CASCADE,
-        tracking_number VARCHAR(100) NOT NULL UNIQUE,
-        courier_name VARCHAR(100) NOT NULL,
-        current_location VARCHAR(255) NOT NULL,
-        shipping_status VARCHAR(50) NOT NULL,
-        stage INTEGER NOT NULL DEFAULT 1,
+        shipping_type shipping_type_enum NOT NULL,
+        courier_name TEXT NOT NULL,
+        tracking_number TEXT NOT NULL,
+        shipping_status shipping_status_enum NOT NULL,
+        current_location TEXT NOT NULL,
         last_updated TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -596,9 +613,9 @@ const runMigrations = async () => {
       const unitCheck = await query("SELECT id FROM units WHERE id IN ('NGY-26-071', 'NGY-26-072')");
       if (unitCheck.rowCount >= 2) {
         await query(`
-          INSERT INTO logistics_tracking (application_id, tracking_number, courier_name, current_location, shipping_status, stage) VALUES
-          ('NGY-26-071', 'RESI-DUMMY-01', 'JNE Express', 'Package handed over to courier at Central Warehouse', 'PREPARING', 1),
-          ('NGY-26-072', 'RESI-DUMMY-02', 'J&T Express', 'Package in transit to Sortation Center Jakarta', 'IN TRANSIT', 2);
+          INSERT INTO logistics_tracking (application_id, shipping_type, courier_name, tracking_number, shipping_status, current_location) VALUES
+          ('NGY-26-071', 'INBOUND', 'JNE Express', 'RESI-DUMMY-01', 'PREPARING', 'Warranty Kit handed over to courier at Central Warehouse'),
+          ('NGY-26-072', 'OUTBOUND', 'J&T Express', 'RESI-DUMMY-02', 'IN_TRANSIT', 'Warranty Kit in transit to Sortation Center Jakarta');
         `);
       }
     }
