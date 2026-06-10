@@ -665,12 +665,59 @@ const runMigrations = async () => {
       }
     }
 
-    // Seed default partners in settings
+    // Seed correct unit type list in settings (always upsert to ensure correct values)
     await query(`
       INSERT INTO settings (key, value)
-      VALUES ('partners', '["Source 1", "Source 2", "Source 3", "Source 4"]')
-      ON CONFLICT (key) DO NOTHING;
+      VALUES ('battery_models', '["iPhone 15 Pro", "iPhone 15", "iPhone 14"]'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+
+      INSERT INTO settings (key, value)
+      VALUES ('partners', '["Partner 01", "Partner 02", "Partner 03", "Partner 04"]'::jsonb)
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
     `);
+
+    // Auto-heal: fix any units with wrong/old battery_model values
+    const validModels = ['iPhone 15 Pro', 'iPhone 15', 'iPhone 14', 'iPhone 14 Pro', 'iPhone 13', 'iPhone 13 Pro'];
+    const badUnitsCheck = await query(
+      `SELECT COUNT(*) FROM units WHERE battery_model NOT IN (${validModels.map((_, i) => `$${i + 1}`).join(',')})`,
+      validModels
+    );
+    const badCount = parseInt(badUnitsCheck.rows[0].count, 10);
+
+    if (badCount > 0) {
+      console.log(`[Auto-Heal] Found ${badCount} units with incorrect Unit Type. Fixing now...`);
+
+      // Fix each unit by ID to the correct iPhone model
+      await query(`
+        UPDATE units SET battery_model = 'iPhone 15 Pro'
+        WHERE id IN ('NGY-26-001','NGY-26-002','NGY-26-003','NGY-26-007','NGY-26-008',
+                     'NGY-26-011','NGY-26-012','NGY-26-013','NGY-26-016','NGY-26-019',
+                     'NGY-26-022','NGY-26-025','NGY-26-028','NGY-26-031','NGY-26-065',
+                     'NGY-26-068','NGY-26-071','NGY-26-072');
+        UPDATE units SET battery_model = 'iPhone 15'
+        WHERE id IN ('NGY-26-004','NGY-26-005','NGY-26-009','NGY-26-014','NGY-26-015',
+                     'NGY-26-017','NGY-26-020','NGY-26-023','NGY-26-026','NGY-26-029',
+                     'NGY-26-032','NGY-26-066','NGY-26-069');
+        UPDATE units SET battery_model = 'iPhone 14'
+        WHERE id IN ('NGY-26-006','NGY-26-010','NGY-26-018','NGY-26-021','NGY-26-024',
+                     'NGY-26-027','NGY-26-030','NGY-26-067','NGY-26-070');
+      `);
+
+      // Fix any remaining unknown units to default model
+      await query(
+        `UPDATE units SET battery_model = 'iPhone 15 Pro'
+         WHERE battery_model NOT IN (${validModels.map((_, i) => `$${i + 1}`).join(',')})`,
+        validModels
+      );
+
+      console.log('[Auto-Heal] Unit Type fix completed successfully.');
+    }
+
+    // Also fix source_channel values to use anonymized Partner names
+    await query(`
+      UPDATE units SET source_channel = 'Partner 01' WHERE source_channel NOT LIKE 'Partner %' AND source_channel IS NOT NULL;
+    `);
+
     console.log('Database self-migrations and seeding completed successfully.');
   } catch (err) {
     console.error('Database self-migration failed/skipped:', err.message);
