@@ -18,10 +18,13 @@ const reseed = async () => {
     
     // Explicitly drop tables with cascade to clean slate
     await client.query('DROP TABLE IF EXISTS activity_logs CASCADE;');
+    await client.query('DROP TABLE IF EXISTS logistics_tracking CASCADE;');
     await client.query('DROP TABLE IF EXISTS system_users CASCADE;');
     await client.query('DROP TABLE IF EXISTS units CASCADE;');
     await client.query('DROP TABLE IF EXISTS companies CASCADE;');
     await client.query('DROP TABLE IF EXISTS settings CASCADE;');
+    await client.query('DROP TYPE IF EXISTS shipping_type_enum CASCADE;');
+    await client.query('DROP TYPE IF EXISTS shipping_status_enum CASCADE;');
     
     console.log('Executing init.sql database script...');
     await client.query(sql);

@@ -586,16 +586,22 @@ const runMigrations = async () => {
   try {
     console.log('Running backend database self-migrations...');
     
-    // Ensure logistics_tracking table exists with correct schema
+    // Ensure ENUM types exist (non-destructive)
     await query(`
-      DROP TABLE IF EXISTS logistics_tracking CASCADE;
-      DROP TYPE IF EXISTS shipping_type_enum CASCADE;
-      DROP TYPE IF EXISTS shipping_status_enum CASCADE;
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'shipping_type_enum') THEN
+          CREATE TYPE shipping_type_enum AS ENUM ('INBOUND', 'OUTBOUND');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'shipping_status_enum') THEN
+          CREATE TYPE shipping_status_enum AS ENUM ('PREPARING', 'IN_TRANSIT', 'DELIVERED');
+        END IF;
+      END$$;
+    `);
 
-      CREATE TYPE shipping_type_enum AS ENUM ('INBOUND', 'OUTBOUND');
-      CREATE TYPE shipping_status_enum AS ENUM ('PREPARING', 'IN_TRANSIT', 'DELIVERED');
-
-      CREATE TABLE logistics_tracking (
+    // Ensure logistics_tracking table exists (non-destructive - preserves existing data)
+    await query(`
+      CREATE TABLE IF NOT EXISTS logistics_tracking (
         application_id VARCHAR(50) PRIMARY KEY REFERENCES units(id) ON DELETE CASCADE,
         shipping_type shipping_type_enum NOT NULL,
         courier_name TEXT NOT NULL,
@@ -606,16 +612,17 @@ const runMigrations = async () => {
       );
     `);
 
-    // Optionally auto-seed default tracking records if empty
+    // Seed only if table is empty (first-time only, never overwrites existing data)
     const trackingCheck = await query("SELECT COUNT(*) FROM logistics_tracking");
     if (parseInt(trackingCheck.rows[0].count, 10) === 0) {
-      console.log('Database logistics_tracking table is empty! Seeding default tracking records...');
+      console.log('logistics_tracking is empty, seeding initial demo records...');
       const unitCheck = await query("SELECT id FROM units WHERE id IN ('NGY-26-071', 'NGY-26-072')");
       if (unitCheck.rowCount >= 2) {
         await query(`
           INSERT INTO logistics_tracking (application_id, shipping_type, courier_name, tracking_number, shipping_status, current_location) VALUES
           ('NGY-26-071', 'INBOUND', 'JNE Express', 'RESI-DUMMY-01', 'PREPARING', 'Warranty Kit handed over to courier at Central Warehouse'),
-          ('NGY-26-072', 'OUTBOUND', 'J&T Express', 'RESI-DUMMY-02', 'IN_TRANSIT', 'Warranty Kit in transit to Sortation Center Jakarta');
+          ('NGY-26-072', 'OUTBOUND', 'J&T Express', 'RESI-DUMMY-02', 'IN_TRANSIT', 'Warranty Kit in transit to Sortation Center Jakarta')
+          ON CONFLICT (application_id) DO NOTHING;
         `);
       }
     }
