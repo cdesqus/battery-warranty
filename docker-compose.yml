@@ -15,7 +15,7 @@ services:
     ports:
       - "5433:5432" # Allows external connections for DB inspection/management
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_v2:/var/lib/postgresql/data
       # Automatically run schema definition and data seeding on first startup
       - ./server/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
@@ -57,5 +57,5 @@ services:
       - backend
 
 volumes:
-  postgres_data:
+  postgres_data_v2:
     driver: local
